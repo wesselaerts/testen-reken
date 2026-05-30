@@ -121,6 +121,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 #cover .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:.95;font-size:.82em;margin:0 1px;}
 #cover .frac .num{padding:0 3px 1px;}
 #cover .frac .den{padding:1px 3px 0;border-top:2px solid currentColor;}
+#cover .frac .num,#cover .frac .den{min-width:.62em;text-align:center;}
+#cover .frac .num:empty::after,#cover .frac .den:empty::after{content:"\25af";opacity:.45;}
+#cover .frac .cursor{width:6px;border-bottom-width:2px;transform:translateY(-1px);}
 #cover .rad{border-top:2px solid currentColor;padding:0 2px;margin-left:-1px;}
 #cover .pad{flex:1;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);gap:5px 6px;min-height:0;}
 #cover .cell{display:flex;flex-direction:column;justify-content:flex-end;min-height:0;min-width:0;}
@@ -634,7 +637,7 @@ const Calc = (function(){
 const state = {
   tokens: [],          // {code, disp, isVar?}
   cursor: 0,
-  history: [],         // {exprDisp, struct, dec, showDec}
+  history: [],         // {exprTokens, struct, dec, showDec}
   mode: 'RAD',         // DEG | RAD | GRAD
   second: false,
   ans: 0,
@@ -751,8 +754,47 @@ function insert(code, disp, extra){
   state.tokens.splice(state.cursor,0,tok);
   state.cursor++;
 }
+/* breuk-sjabloon: gestapelde teller/noemer, cursor begint in de teller */
+function insertFraction(){
+  const p=state.cursor;
+  state.tokens.splice(p,0,
+    {code:'(',  disp:'', frac:'open'},
+    {code:')/(',disp:'', frac:'bar'},
+    {code:')',  disp:'', frac:'close'}
+  );
+  state.cursor=p+1;
+}
+/* vind [open,close]-grenzen van de breuk waartoe de marker op idx hoort (incl. nesting) */
+function fracBoundsAt(idx){
+  let openIdx;
+  if(state.tokens[idx].frac==='open') openIdx=idx;
+  else {
+    let depth=0;
+    for(let j=idx;j>=0;j--){
+      const f=state.tokens[j].frac;
+      if(f==='close') depth++;
+      else if(f==='open'){ if(depth===0){openIdx=j;break;} depth--; }
+    }
+  }
+  let depth=0, closeIdx=state.tokens.length-1;
+  for(let j=openIdx;j<state.tokens.length;j++){
+    const f=state.tokens[j].frac;
+    if(f==='open') depth++;
+    else if(f==='close'){ depth--; if(depth===0){closeIdx=j;break;} }
+  }
+  return [openIdx, closeIdx];
+}
 function backspace(){
-  if(state.cursor>0){ state.tokens.splice(state.cursor-1,1); state.cursor--; }
+  if(state.cursor<=0) return;
+  const t=state.tokens[state.cursor-1];
+  if(t && t.frac){
+    const [o,c]=fracBoundsAt(state.cursor-1);
+    state.tokens.splice(o, c-o+1);
+    state.cursor=o;
+  } else {
+    state.tokens.splice(state.cursor-1,1);
+    state.cursor--;
+  }
 }
 function clearEntry(){ state.tokens=[]; state.cursor=0; }
 function maybeAns(){ if(state.tokens.length===0){ insert('A','Ans'); } }
@@ -823,7 +865,7 @@ function handleKey(id){
     /* --- haakjes & frac --- */
     case 'lpar': if(s) insert('%','%'); else insert('('); break;
     case 'rpar': if(s){ toast('▶% – niet in webversie'); } else insert(')'); break;
-    case 'nd':   if(s){ toast('U n/d (gemengd getal) – niet in webversie'); } else insert('/','/'); break;
+    case 'nd':   insertFraction(); break;
 
     /* --- constanten --- */
     case 'pi':   if(s){ toast('hyp – niet in webversie'); } else insert('π','π'); break;
@@ -906,17 +948,26 @@ function evalEntryToAns(){
 }
 
 /* =================== BEREKENEN =================== */
+function hasEmptyFracSlot(){
+  for(let i=0;i<state.tokens.length;i++){
+    const f=state.tokens[i].frac, nx=state.tokens[i+1];
+    if(f==='open' && nx && nx.frac==='bar') return true;   // lege teller
+    if(f==='bar'  && nx && nx.frac==='close') return true; // lege noemer
+  }
+  return false;
+}
 function doEnter(){
   if(state.tokens.length===0) return;
-  const exprDisp = state.tokens.map(t=>t.disp).join('');
+  if(hasEmptyFracSlot()){ toast('Vul de breuk in'); return; }
+  const exprTokens = state.tokens.map(t=>Object.assign({},t));
   let val, ok=true;
   try{ val = evaluate(buildCode()); }catch(e){ ok=false; }
   if(!ok || !isFinite(val) || isNaN(val)){
-    state.history.push({exprDisp, struct:{type:'err'}, dec:'Error', showDec:true});
+    state.history.push({exprTokens, struct:{type:'err'}, dec:'Error', showDec:true});
   } else {
     state.ans = val;
     const struct = prettify(val);
-    state.history.push({exprDisp, struct, dec:fmtDec(val), showDec:false});
+    state.history.push({exprTokens, struct, dec:fmtDec(val), showDec:false});
   }
   if(state.history.length>40) state.history.shift();
   clearEntry();
@@ -1034,6 +1085,20 @@ function resHTML(h){
 }
 
 /* =================== RENDER =================== */
+/* zet een tokenreeks om naar HTML; gestapelde breuken + knipperende cursor op positie 'cursor' (-1 = geen) */
+function tokensHTML(tokens, cursor){
+  let out='';
+  for(let i=0;i<=tokens.length;i++){
+    if(i===cursor) out+='<span class="cursor"></span>';
+    if(i>=tokens.length) break;
+    const t=tokens[i];
+    if(t.frac==='open')       out+='<span class="frac"><span class="num">';
+    else if(t.frac==='bar')   out+='</span><span class="den">';
+    else if(t.frac==='close') out+='</span></span>';
+    else out+=escapeExpr(t.disp);
+  }
+  return out;
+}
 function render(){
   document.getElementById('st-2nd').textContent = state.second ? '2ND' : '';
   document.getElementById('st-mode').textContent = state.mode;
@@ -1045,14 +1110,12 @@ function render(){
   state.history.forEach(h=>{
     const line=document.createElement('div');
     line.className='hline';
-    line.innerHTML = '<div class="hexpr"><span>'+escapeExpr(h.exprDisp)+'</span></div><div class="hres">'+resHTML(h)+'</div>';
+    line.innerHTML = '<div class="hexpr"><span>'+tokensHTML(h.exprTokens||[],-1)+'</span></div><div class="hres">'+resHTML(h)+'</div>';
     scr.appendChild(line);
   });
   const act=document.createElement('div');
   act.className='hline active';
-  const before = state.tokens.slice(0,state.cursor).map(t=>t.disp).join('');
-  const after  = state.tokens.slice(state.cursor).map(t=>t.disp).join('');
-  act.innerHTML='<div class="hexpr"><span>'+escapeExpr(before)+'<span class="cursor"></span>'+escapeExpr(after)+'</span></div><div class="hres"></div>';
+  act.innerHTML='<div class="hexpr"><span>'+tokensHTML(state.tokens,state.cursor)+'</span></div><div class="hres"></div>';
   scr.appendChild(act);
   scr.scrollTop = scr.scrollHeight;
 }
@@ -1716,11 +1779,13 @@ function shufflePlay(){
    SHEETS (add / menu / pin / album)
    ================================================================= */
 const scrim=$('#scrim'),sheetHost=$('#sheetHost');
+let sheetCloseTimer;
 function openSheet(html){
+  clearTimeout(sheetCloseTimer);
   sheetHost.innerHTML=`<div class="sheet">${html}</div>`;
   scrim.classList.add('show');
 }
-function closeSheet(){scrim.classList.remove('show');setTimeout(()=>sheetHost.innerHTML='',200);}
+function closeSheet(){scrim.classList.remove('show');clearTimeout(sheetCloseTimer);sheetCloseTimer=setTimeout(()=>sheetHost.innerHTML='',200);}
 scrim.addEventListener('click',e=>{if(e.target===scrim)closeSheet();});
 
 /* add */
