@@ -500,6 +500,10 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <button class="btn-ghost" id="btnImport" style="padding:9px 14px;border-radius:11px;font-size:13px;">Kies bestand</button>
       </div>
       <input type="file" id="importPick" accept="application/json,.json" style="display:none">
+      <div class="set-row">
+        <div class="lab">Bestaande video's versleutelen<small id="encInfo">Versleutelt oudere, nog niet versleutelde video's</small></div>
+        <button class="btn-ghost" id="btnEncryptAll" style="padding:9px 14px;border-radius:11px;font-size:13px;">Versleutel</button>
+      </div>
       <div class="set-row" id="rowDeleteAll">
         <div class="lab" style="color:var(--v-rose)">Alles wissen<small>Verwijder alle video's onherstelbaar</small></div>
         <button class="btn-ghost" id="btnWipe" style="padding:9px 14px;border-radius:11px;font-size:13px;color:var(--v-rose);">Wissen</button>
@@ -654,14 +658,37 @@ async function encBuf(buf){const iv=_rand(12);const data=await crypto.subtle.enc
 async function decBuf(o){return crypto.subtle.decrypt({name:'AES-GCM',iv:o.iv},MK,o.data);}
 async function encStr(s){return encBuf(new TextEncoder().encode(s||''));}
 async function decStr(o){return new TextDecoder().decode(await decBuf(o));}
-async function encBlob(blob){const o=await encBuf(await blob.arrayBuffer());o.mime=blob.type||'video/mp4';return o;}
-async function decBlobToBlob(o){return new Blob([await decBuf(o)],{type:o.mime||'video/mp4'});}
+const ENC_CHUNK=4*1024*1024; // 4 MB per blok — houdt het geheugengebruik laag op de telefoon
+/* sla een blob blok-voor-blok versleuteld op in de 'blobs'-store; retourneert het aantal blokken */
+async function storeChunks(id, blob){
+  const size=blob.size||0; let n=0;
+  for(let off=0; off<size; off+=ENC_CHUNK){
+    const buf=await blob.slice(off, Math.min(off+ENC_CHUNK,size)).arrayBuffer();
+    await idbPutChunk(id+'#'+n, await encBuf(buf));
+    n++;
+  }
+  if(n===0){ await idbPutChunk(id+'#0', await encBuf(new ArrayBuffer(0))); n=1; }
+  return n;
+}
+async function delChunks(id, n){ for(let i=0;i<n;i++){ try{ await idbDelChunk(id+'#'+i); }catch(e){} } }
+/* zet versleutelde blokken weer om naar één blob (elk blok als sub-blob → geheugen blijft laag) */
+async function loadChunkedBlob(id, info){
+  const parts=[];
+  for(let i=0;i<info.n;i++){
+    const c=await idbGetChunk(id+'#'+i); if(!c) continue;
+    parts.push(new Blob([await decBuf(c)],{type:info.mime||'video/mp4'}));
+  }
+  return new Blob(parts,{type:info.mime||'video/mp4'});
+}
+async function decBlobToBlob(o){ // legacy enkelvoudig formaat (oude versleutelde records)
+  return new Blob([await decBuf(o)],{type:(o&&o.mime)||'video/mp4'});
+}
 async function requestPersist(){
   try{ if(navigator.storage&&navigator.storage.persist){ if(!(navigator.storage.persisted&&await navigator.storage.persisted())) await navigator.storage.persist(); } }catch(e){}
 }
 
 /* ---------- IndexedDB ---------- */
-const DB_NAME='numa.store',DB_VER=1;
+const DB_NAME='numa.store',DB_VER=2;
 let _db;
 function db(){
   if(_db)return Promise.resolve(_db);
@@ -671,6 +698,7 @@ function db(){
       const d=e.target.result;
       if(!d.objectStoreNames.contains('videos'))d.createObjectStore('videos',{keyPath:'id'});
       if(!d.objectStoreNames.contains('albums'))d.createObjectStore('albums',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('blobs'))d.createObjectStore('blobs'); // versleutelde blokken (losse sleutels)
     };
     r.onsuccess=()=>{_db=r.result;res(_db);};
     r.onerror=()=>rej(r.error);
@@ -678,30 +706,33 @@ function db(){
 }
 function tx(store,mode='readonly'){return db().then(d=>d.transaction(store,mode).objectStore(store));}
 function idbReq(req){return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error);});}
+async function idbPutChunk(key,val){return idbReq((await tx('blobs','readwrite')).put(val,key));}
+async function idbGetChunk(key){return idbReq((await tx('blobs')).get(key));}
+async function idbDelChunk(key){return idbReq((await tx('blobs','readwrite')).delete(key));}
 /* een video-record voor opslag opbouwen (versleutelt gevoelige velden als er een masterkey is) */
 async function encodeRecord(v){
   const r={id:v.id,type:v.type,mime:v.mime,size:v.size||0,duration:v.duration||0,
     addedAt:v.addedAt,views:v.views||0,lastViewedAt:v.lastViewedAt||0,
     favorite:!!v.favorite,album:v.album||null,resume:v.resume||0,decoy:!!v.decoy};
-  if(MK && !v.decoy){
+  if(MK && !v.decoy && !v._plain){
     r.enc=true;
     r.titleEnc=await encStr(v.title||'');
     r.thumbEnc=v.thumb?await encStr(v.thumb):null;
     if(v.type==='url'){ r.urlEnc=await encStr(v.url||''); }
-    else { r.blobEnc = v._encBlob ? v._encBlob : (v.blob?await encBlob(v.blob):null); }
+    else { r.blobEnc = v._blobEnc || null; }   // blokken al opgeslagen door putVideo
   }else{
     r.title=v.title||''; r.thumb=v.thumb||null;
     if(v.type==='url') r.url=v.url||''; else if(v.blob) r.blob=v.blob;
   }
   return r;
 }
-/* opgeslagen record terug naar werkbare (ontsleutelde) vorm; blob blijft versleuteld tot afspelen */
+/* opgeslagen record → werkbare vorm; bloktellers blijven, blob blijft versleuteld tot afspelen */
 async function decodeRecord(r){
   if(!r.enc) return r;
   const v={id:r.id,type:r.type,mime:r.mime,size:r.size,duration:r.duration,
     addedAt:r.addedAt,views:r.views,lastViewedAt:r.lastViewedAt,
     favorite:r.favorite,album:r.album,resume:r.resume,decoy:r.decoy,enc:true,
-    _encBlob:r.blobEnc||null};
+    _blobEnc:r.blobEnc||null};
   try{
     v.title=r.titleEnc?await decStr(r.titleEnc):'';
     v.thumb=r.thumbEnc?await decStr(r.thumbEnc):null;
@@ -709,10 +740,23 @@ async function decodeRecord(r){
   }catch(e){ v.title='(versleuteld)'; v.thumb=null; }
   return v;
 }
-async function putVideo(v){const rec=await encodeRecord(v);return idbReq((await tx('videos','readwrite')).put(rec));}
+async function putVideo(v){
+  // nieuwe versleutelde videobestanden: blob blok-voor-blok opslaan (geheugenveilig), één keer
+  if(MK && !v.decoy && !v._plain && v.type==='file' && v.blob && !v._blobEnc){
+    const id=v.id;
+    const n=await storeChunks(id, v.blob);
+    v._blobEnc={chunked:true, n, mime:v.blob.type||'video/mp4', size:v.blob.size||0};
+    v.blob=null;  // geef geheugen vrij
+  }
+  const rec=await encodeRecord(v);
+  return idbReq((await tx('videos','readwrite')).put(rec));
+}
 async function putVideoRaw(rec){return idbReq((await tx('videos','readwrite')).put(rec));}
 async function getVideo(id){return idbReq((await tx('videos')).get(id));}
-async function delVideo(id){return idbReq((await tx('videos','readwrite')).delete(id));}
+async function delVideo(id){
+  try{ const rec=await getVideo(id); if(rec && rec.blobEnc && rec.blobEnc.chunked){ await delChunks(id, rec.blobEnc.n); } }catch(e){}
+  return idbReq((await tx('videos','readwrite')).delete(id));
+}
 async function allVideos(){return idbReq((await tx('videos')).getAll());}
 async function putAlbum(a){return idbReq((await tx('albums','readwrite')).put(a));}
 async function allAlbums(){return idbReq((await tx('albums')).getAll());}
@@ -730,18 +774,28 @@ async function refreshData(){
     }else{
       if(r.decoy) continue;                        // echte kluis: lok-items verbergen
       if(r.enc){ if(MK) out.push(await decodeRecord(r)); }
-      else out.push(r);                            // ouder (onversleuteld) item
+      else { r._plain=true; out.push(r); }         // ouder (onversleuteld) item — zo laten
     }
   }
   VIDEOS=out;
 }
-/* eenmalige migratie: bestaande onversleutelde items alsnog versleutelen */
-async function migrateToEncrypted(){
-  if(!MK) return;
+/* handmatig & veilig: bestaande onversleutelde video's één voor één blok-voor-blok versleutelen */
+async function migrateToEncrypted(onProgress){
+  if(!MK) return {done:0,total:0};
   const raw=(await allVideos())||[];
+  const todo=raw.filter(r=>!r.enc && !r.decoy);
+  let done=0;
   for(const r of raw){
-    if(!r.enc && !r.decoy){ try{ await putVideo(r); }catch(e){} }
+    if(r.enc || r.decoy) continue;
+    try{
+      const v=Object.assign({}, r);       // bevat nog de platte blob/titel/thumb
+      delete v._plain;                    // forceer versleuteling
+      await putVideo(v);                  // slaat blokken op + versleutelt metadata
+    }catch(e){ console.warn('versleutelen mislukt', e); }
+    done++; if(onProgress) onProgress(done, todo.length);
+    await new Promise(r=>setTimeout(r,30)); // adempauze voor de UI/geheugen
   }
+  return {done, total:todo.length};
 }
 
 /* =================================================================
@@ -1436,7 +1490,6 @@ async function openVault(code, decoy){
   try{ if(!decoyMode && code!=null) await ensureCrypto(code); }catch(e){ console.warn(e); }
   await refreshData(); renderAll(); updateStorage();
   requestPersist();
-  if(!decoyMode){ migrateToEncrypted().then(()=>refreshData().then(renderAll)).catch(()=>{}); }
 }
 function lockVault(){
   closePlayer();
@@ -1498,7 +1551,13 @@ window.addEventListener('message',async ev=>{
       const rec=await getVideo(d.id);
       if(rec){
         if(rec.type==='url'){ url = rec.enc ? await decStr(rec.urlEnc) : rec.url; }
-        else { const blob = rec.enc ? await decBlobToBlob(rec.blobEnc) : rec.blob; if(blob){ url=URL.createObjectURL(blob); auxUrls.push(url); } }
+        else {
+          let blob;
+          if(rec.enc && rec.blobEnc && rec.blobEnc.chunked) blob=await loadChunkedBlob(rec.id, rec.blobEnc);
+          else if(rec.enc) blob=await decBlobToBlob(rec.blobEnc);
+          else blob=rec.blob;
+          if(blob){ url=URL.createObjectURL(blob); auxUrls.push(url); }
+        }
       }
     }catch(e){}
     f.contentWindow.postMessage({type:'mx:url',req:d.req,id:d.id,url},'*');
@@ -1834,7 +1893,10 @@ async function loadCurrent(){
   let src;
   if(curVid.type==='file'){
     const fresh=await getVideo(curVid.id);
-    const blob = fresh.enc ? await decBlobToBlob(fresh.blobEnc) : fresh.blob;
+    let blob;
+    if(fresh.enc && fresh.blobEnc && fresh.blobEnc.chunked) blob=await loadChunkedBlob(fresh.id, fresh.blobEnc);
+    else if(fresh.enc) blob=await decBlobToBlob(fresh.blobEnc);  // legacy enkelvoudig
+    else blob=fresh.blob;                                        // onversleuteld
     curObjUrl=URL.createObjectURL(blob);src=curObjUrl;
   }else src=curVid.url;
   V.src=src;
@@ -2117,7 +2179,12 @@ async function serializeVideo(r){
   const o=Object.assign({},r);
   if(r.enc){
     o.titleEnc=_encField(r.titleEnc); o.thumbEnc=_encField(r.thumbEnc);
-    if(r.type==='url') o.urlEnc=_encField(r.urlEnc); else o.blobEnc=_encField(r.blobEnc);
+    if(r.type==='url'){ o.urlEnc=_encField(r.urlEnc); }
+    else if(r.blobEnc && r.blobEnc.chunked){
+      const ch=[];
+      for(let i=0;i<r.blobEnc.n;i++){ const c=await idbGetChunk(r.id+'#'+i); ch.push(c?{iv:_b64e(c.iv),data:_b64e(c.data)}:null); }
+      o.blobEnc=Object.assign({},r.blobEnc); o.chunkData=ch;
+    } else { o.blobEnc=_encField(r.blobEnc); }   // legacy enkelvoudig
   }else if(r.blob){
     o.blob={__blob:true, mime:r.blob.type||'video/mp4', data:_b64e(await r.blob.arrayBuffer())};
   }
@@ -2127,11 +2194,18 @@ function deserializeVideo(sv){
   const o=Object.assign({},sv);
   if(sv.enc){
     o.titleEnc=_decField(sv.titleEnc); o.thumbEnc=_decField(sv.thumbEnc);
-    if(sv.type==='url') o.urlEnc=_decField(sv.urlEnc); else o.blobEnc=_decField(sv.blobEnc);
+    if(sv.type==='url'){ o.urlEnc=_decField(sv.urlEnc); }
+    else if(sv.blobEnc && sv.blobEnc.chunked){ o.blobEnc=Object.assign({},sv.blobEnc); delete o.chunkData; }
+    else { o.blobEnc=_decField(sv.blobEnc); }
   }else if(sv.blob && sv.blob.__blob){
     o.blob=new Blob([_b64d(sv.blob.data)],{type:sv.blob.mime||'video/mp4'});
   }
   return o;
+}
+async function restoreChunks(sv){
+  if(sv.enc && sv.blobEnc && sv.blobEnc.chunked && Array.isArray(sv.chunkData)){
+    for(let i=0;i<sv.chunkData.length;i++){ const c=sv.chunkData[i]; if(c) await idbPutChunk(sv.id+'#'+i, {iv:_b64d(c.iv), data:_b64d(c.data).buffer}); }
+  }
 }
 async function exportBackup(){
   toast('Back-up maken…',true);
@@ -2163,18 +2237,33 @@ async function importBackup(file){
     const d=await db();
     await Promise.all([
       new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
-      new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;})
+      new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;}),
+      new Promise(r=>{const t=d.transaction('blobs','readwrite');t.objectStore('blobs').clear();t.oncomplete=r;})
     ]);
     for(const a of (data.albums||[])) await putAlbum(a);
-    for(const sv of (data.videos||[])) await putVideoRaw(deserializeVideo(sv));
+    for(const sv of (data.videos||[])){ await restoreChunks(sv); await putVideoRaw(deserializeVideo(sv)); }
     hideToast();
     toast('Teruggezet ✓ — open opnieuw met de code uit de back-up',false,5000);
     setTimeout(lockVault,900);
   }catch(e){hideToast();toast('Terugzetten mislukt');console.warn(e);}
 }
-$('#btnExport').addEventListener('click',exportBackup);
-$('#btnImport').addEventListener('click',()=>$('#importPick').click());
+$('#btnExport').addEventListener('click',exportBackup);$('#btnImport').addEventListener('click',()=>$('#importPick').click());
 $('#importPick').addEventListener('change',e=>{ if(e.target.files[0])importBackup(e.target.files[0]); e.target.value=''; });
+$('#btnEncryptAll').addEventListener('click',async()=>{
+  if(!MK){ toast('Open de kluis eerst met je code'); return; }
+  const raw=(await allVideos())||[];
+  const todo=raw.filter(r=>!r.enc && !r.decoy).length;
+  if(!todo){ toast('Alles is al versleuteld ✓'); return; }
+  if(!confirm(todo+' video'+(todo===1?'':'\u2019s')+' versleutelen? Dit kan even duren — laat de app open.')) return;
+  $('#btnEncryptAll').disabled=true;
+  toast('Versleutelen… 0/'+todo,true);
+  try{
+    await migrateToEncrypted((done,total)=>{ toast('Versleutelen… '+done+'/'+total,true); });
+    await refreshData(); renderAll(); updateStorage();
+    hideToast(); toast('Klaar — alles versleuteld ✓');
+  }catch(e){ hideToast(); toast('Versleutelen onderbroken'); }
+  $('#btnEncryptAll').disabled=false;
+});
 
 async function updateStorage(){
   const info=$('#storageInfo');
@@ -2198,7 +2287,8 @@ $('#btnWipe').addEventListener('click',async()=>{
   if(!confirm('Echt zeker? Dit kan niet ongedaan worden.'))return;
   const d=await db();await Promise.all([
     new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
-    new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;})
+    new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;}),
+    new Promise(r=>{const t=d.transaction('blobs','readwrite');t.objectStore('blobs').clear();t.oncomplete=r;})
   ]);
   await refreshData();renderAll();updateStorage();toast('Alles gewist');
 });
