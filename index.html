@@ -472,6 +472,10 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <button class="btn-ghost" id="btnChangePin" style="padding:9px 14px;border-radius:11px;font-size:13px;">Wijzig</button>
       </div>
       <div class="set-row">
+        <div class="lab">Noodcode<small id="duressInfo">Opent een lege lokkluis</small></div>
+        <button class="btn-ghost" id="btnDuress" style="padding:9px 14px;border-radius:11px;font-size:13px;">Instellen</button>
+      </div>
+      <div class="set-row">
         <div class="lab">Automatisch vergrendelen<small>Sluit bij wegklikken van de app</small></div>
         <div class="switch on" id="swAutolock"></div>
       </div>
@@ -483,11 +487,20 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <div class="lab">Opslag<small id="storageInfo">Berekenen…</small></div>
         <button class="btn-ghost" id="btnPersist" style="padding:9px 14px;border-radius:11px;font-size:13px;">Vastzetten</button>
       </div>
+      <div class="set-row">
+        <div class="lab">Back-up exporteren<small>Versleutelde kopie als bestand</small></div>
+        <button class="btn-ghost" id="btnExport" style="padding:9px 14px;border-radius:11px;font-size:13px;">Exporteer</button>
+      </div>
+      <div class="set-row">
+        <div class="lab">Back-up terugzetten<small>Overschrijft de huidige kluis</small></div>
+        <button class="btn-ghost" id="btnImport" style="padding:9px 14px;border-radius:11px;font-size:13px;">Kies bestand</button>
+      </div>
+      <input type="file" id="importPick" accept="application/json,.json" style="display:none">
       <div class="set-row" id="rowDeleteAll">
         <div class="lab" style="color:var(--v-rose)">Alles wissen<small>Verwijder alle video's onherstelbaar</small></div>
         <button class="btn-ghost" id="btnWipe" style="padding:9px 14px;border-radius:11px;font-size:13px;color:var(--v-rose);">Wissen</button>
       </div>
-      <p class="hint" style="margin-top:18px;">Numa Vault • video's worden lokaal op dit apparaat bewaard en verlaten je toestel niet. Dit is privacy door verberging — gebruik geen onmisbare bestanden zonder back-up.</p>
+      <p class="hint" style="margin-top:18px;">Numa Vault • video's worden lokaal en versleuteld op dit apparaat bewaard (sleutel afgeleid van je code) en verlaten je toestel niet. Maak af en toe een back-up — opslag op een telefoon kan door het systeem gewist worden.</p>
     </div>
   </div>
 
@@ -594,6 +607,52 @@ async function ensurePin(){
   savePrefs(prefs);
 }
 
+/* ---------- versleuteling (envelope: random masterkey, gewikkeld door je pincode) ---------- */
+let MK=null;            // masterkey – alleen in geheugen tijdens een geopende sessie
+let decoyMode=false;    // true wanneer geopend met de noodcode (lokkluis)
+const KDF_ITER=150000;
+function _rand(n){return crypto.getRandomValues(new Uint8Array(n));}
+function _b64e(buf){const b=new Uint8Array(buf);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
+function _b64d(str){const bin=atob(str);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+async function _kek(code,salt){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(code),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:KDF_ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function ensureCrypto(code){
+  // herstel of maak de masterkey voor deze sessie
+  const salt = prefs.kdfSalt ? _b64d(prefs.kdfSalt) : _rand(16);
+  const kek = await _kek(code, salt);
+  if(prefs.wrappedKey){
+    const raw = await crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(prefs.wrapIv)}, kek, _b64d(prefs.wrappedKey));
+    MK = await crypto.subtle.importKey('raw', raw, {name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
+  }else{
+    MK = await crypto.subtle.generateKey({name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
+    const raw = await crypto.subtle.exportKey('raw', MK);
+    const iv = _rand(12);
+    const wrapped = await crypto.subtle.encrypt({name:'AES-GCM',iv}, kek, raw);
+    prefs.kdfSalt=_b64e(salt); prefs.wrapIv=_b64e(iv); prefs.wrappedKey=_b64e(wrapped);
+    savePrefs(prefs);
+  }
+}
+async function rewrapKey(newCode){
+  if(!MK) return false;
+  const salt=_rand(16), kek=await _kek(newCode,salt);
+  const raw=await crypto.subtle.exportKey('raw',MK), iv=_rand(12);
+  const wrapped=await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,raw);
+  prefs.kdfSalt=_b64e(salt); prefs.wrapIv=_b64e(iv); prefs.wrappedKey=_b64e(wrapped);
+  savePrefs(prefs);
+  return true;
+}
+async function encBuf(buf){const iv=_rand(12);const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},MK,buf);return {iv,data};}
+async function decBuf(o){return crypto.subtle.decrypt({name:'AES-GCM',iv:o.iv},MK,o.data);}
+async function encStr(s){return encBuf(new TextEncoder().encode(s||''));}
+async function decStr(o){return new TextDecoder().decode(await decBuf(o));}
+async function encBlob(blob){const o=await encBuf(await blob.arrayBuffer());o.mime=blob.type||'video/mp4';return o;}
+async function decBlobToBlob(o){return new Blob([await decBuf(o)],{type:o.mime||'video/mp4'});}
+async function requestPersist(){
+  try{ if(navigator.storage&&navigator.storage.persist){ if(!(navigator.storage.persisted&&await navigator.storage.persisted())) await navigator.storage.persist(); } }catch(e){}
+}
+
 /* ---------- IndexedDB ---------- */
 const DB_NAME='numa.store',DB_VER=1;
 let _db;
@@ -612,7 +671,39 @@ function db(){
 }
 function tx(store,mode='readonly'){return db().then(d=>d.transaction(store,mode).objectStore(store));}
 function idbReq(req){return new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error);});}
-async function putVideo(v){return idbReq((await tx('videos','readwrite')).put(v));}
+/* een video-record voor opslag opbouwen (versleutelt gevoelige velden als er een masterkey is) */
+async function encodeRecord(v){
+  const r={id:v.id,type:v.type,mime:v.mime,size:v.size||0,duration:v.duration||0,
+    addedAt:v.addedAt,views:v.views||0,lastViewedAt:v.lastViewedAt||0,
+    favorite:!!v.favorite,album:v.album||null,resume:v.resume||0,decoy:!!v.decoy};
+  if(MK && !v.decoy){
+    r.enc=true;
+    r.titleEnc=await encStr(v.title||'');
+    r.thumbEnc=v.thumb?await encStr(v.thumb):null;
+    if(v.type==='url'){ r.urlEnc=await encStr(v.url||''); }
+    else { r.blobEnc = v._encBlob ? v._encBlob : (v.blob?await encBlob(v.blob):null); }
+  }else{
+    r.title=v.title||''; r.thumb=v.thumb||null;
+    if(v.type==='url') r.url=v.url||''; else if(v.blob) r.blob=v.blob;
+  }
+  return r;
+}
+/* opgeslagen record terug naar werkbare (ontsleutelde) vorm; blob blijft versleuteld tot afspelen */
+async function decodeRecord(r){
+  if(!r.enc) return r;
+  const v={id:r.id,type:r.type,mime:r.mime,size:r.size,duration:r.duration,
+    addedAt:r.addedAt,views:r.views,lastViewedAt:r.lastViewedAt,
+    favorite:r.favorite,album:r.album,resume:r.resume,decoy:r.decoy,enc:true,
+    _encBlob:r.blobEnc||null};
+  try{
+    v.title=r.titleEnc?await decStr(r.titleEnc):'';
+    v.thumb=r.thumbEnc?await decStr(r.thumbEnc):null;
+    if(r.type==='url') v.url=r.urlEnc?await decStr(r.urlEnc):'';
+  }catch(e){ v.title='(versleuteld)'; v.thumb=null; }
+  return v;
+}
+async function putVideo(v){const rec=await encodeRecord(v);return idbReq((await tx('videos','readwrite')).put(rec));}
+async function putVideoRaw(rec){return idbReq((await tx('videos','readwrite')).put(rec));}
 async function getVideo(id){return idbReq((await tx('videos')).get(id));}
 async function delVideo(id){return idbReq((await tx('videos','readwrite')).delete(id));}
 async function allVideos(){return idbReq((await tx('videos')).getAll());}
@@ -623,8 +714,27 @@ async function delAlbum(id){return idbReq((await tx('albums','readwrite')).delet
 /* in-memory cache for snappy UI */
 let VIDEOS=[],ALBUMS=[];
 async function refreshData(){
-  VIDEOS=(await allVideos())||[];
+  const raw=(await allVideos())||[];
   ALBUMS=(await allAlbums())||[];
+  const out=[];
+  for(const r of raw){
+    if(decoyMode){
+      if(r.decoy && !r.enc) out.push(r);          // lokkluis: alleen lok-items
+    }else{
+      if(r.decoy) continue;                        // echte kluis: lok-items verbergen
+      if(r.enc){ if(MK) out.push(await decodeRecord(r)); }
+      else out.push(r);                            // ouder (onversleuteld) item
+    }
+  }
+  VIDEOS=out;
+}
+/* eenmalige migratie: bestaande onversleutelde items alsnog versleutelen */
+async function migrateToEncrypted(){
+  if(!MK) return;
+  const raw=(await allVideos())||[];
+  for(const r of raw){
+    if(!r.enc && !r.decoy){ try{ await putVideo(r); }catch(e){} }
+  }
 }
 
 /* =================================================================
@@ -910,7 +1020,8 @@ function handleEnter(){
   if(state.tokens.length && state.tokens.every(t=>/^[0-9]$/.test(t.code))){
     const code=state.tokens.map(t=>t.code).join('');
     sha(code).then(h=>{
-      if(h===prefs.pinHash){ reset(); openVault(); }
+      if(h===prefs.pinHash){ reset(); openVault(code,false); }
+      else if(prefs.duressHash && h===prefs.duressHash){ reset(); openVault(code,true); }
       else { doEnter(); render(); }
     }).catch(()=>{ doEnter(); render(); });
     return;
@@ -1311,16 +1422,21 @@ return { reset, render };
 /* =================================================================
    VAULT: navigatie & lock
    ================================================================= */
-function openVault(){
+async function openVault(code, decoy){
+  decoyMode=!!decoy; MK=null;
   $('#cover').classList.remove('active');
   $('#vault').classList.add('active');
-  refreshData().then(renderAll);
-  updateStorage();
+  try{ if(!decoyMode && code!=null) await ensureCrypto(code); }catch(e){ console.warn(e); }
+  await refreshData(); renderAll(); updateStorage();
+  requestPersist();
+  if(!decoyMode){ migrateToEncrypted().then(()=>refreshData().then(renderAll)).catch(()=>{}); }
 }
 function lockVault(){
   closePlayer();
+  MK=null; decoyMode=false; VIDEOS=[];
   $('#vault').classList.remove('active');
   $('#cover').classList.add('active');
+  renderAll();
   // reset rekenmachine-scherm
   Calc.reset();
   $('#searchbar').classList.remove('show');$('#searchInput').value='';searchTerm='';
@@ -1404,7 +1520,7 @@ async function addFiles(files){
       id:uid(),type:'file',title:f.name.replace(/\.[^.]+$/,''),
       blob:f,mime:f.type||'video/mp4',size:f.size,
       duration:meta.dur||0,thumb:meta.thumb,
-      addedAt:Date.now(),views:0,lastViewedAt:0,favorite:false,album:null,resume:0
+      addedAt:Date.now(),views:0,lastViewedAt:0,favorite:false,album:null,resume:0,decoy:decoyMode
     };
     await putVideo(rec);
   }
@@ -1456,7 +1572,7 @@ async function addUrl(url,title){
   const rec={
     id:uid(),type:'url',title:title||(url.split('/').pop()||'').replace(/\.[^.]+$/,'').replace(/[?#].*$/,'')||host||'Video',
     url,mime:'video/mp4',size:0,duration:0,thumb:null,
-    addedAt:Date.now(),views:0,lastViewedAt:0,favorite:false,album:null,resume:0
+    addedAt:Date.now(),views:0,lastViewedAt:0,favorite:false,album:null,resume:0,decoy:decoyMode
   };
   if(NON_DIRECT.test(url)){
     // Bekende pagina-/streamhost: bewaren mag, maar waarschuw dat afspelen waarschijnlijk niet werkt
@@ -1641,7 +1757,8 @@ async function loadCurrent(){
   let src;
   if(curVid.type==='file'){
     const fresh=await getVideo(curVid.id);
-    curObjUrl=URL.createObjectURL(fresh.blob);src=curObjUrl;
+    const blob = fresh.enc ? await decBlobToBlob(fresh.blobEnc) : fresh.blob;
+    curObjUrl=URL.createObjectURL(blob);src=curObjUrl;
   }else src=curVid.url;
   V.src=src;
   $('#pvTitle').childNodes[0].nodeValue=curVid.title;
@@ -1878,6 +1995,7 @@ $('#swAutolock').classList.toggle('on',prefs.autolock!==false);
 $('#swAutoplay').classList.toggle('on',prefs.autoplay!==false);
 $('#swAutolock').addEventListener('click',()=>{prefs.autolock=!prefs.autolock;$('#swAutolock').classList.toggle('on',prefs.autolock);savePrefs(prefs);});
 $('#swAutoplay').addEventListener('click',()=>{prefs.autoplay=!prefs.autoplay;$('#swAutoplay').classList.toggle('on',prefs.autoplay);savePrefs(prefs);});
+refreshDuressInfo();
 
 $('#btnChangePin').addEventListener('click',()=>{
   openSheet(`<div class="grab"></div><h3>Geheime code wijzigen</h3>
@@ -1890,9 +2008,97 @@ $('#btnChangePin').addEventListener('click',()=>{
     const old=$('#pinOld').value,nw=$('#pinNew').value;
     if(await sha(old)!==prefs.pinHash){toast('Huidige code klopt niet');return;}
     if(!/^\d{3,}$/.test(nw)){toast('Kies minstens 3 cijfers');return;}
-    prefs.pinHash=await sha(nw);savePrefs(prefs);closeSheet();toast('Code gewijzigd ✓');
+    prefs.pinHash=await sha(nw);await rewrapKey(nw);savePrefs(prefs);closeSheet();toast('Code gewijzigd ✓');
   };
 });
+/* ---------- noodcode (lokkluis) ---------- */
+function refreshDuressInfo(){
+  const el=$('#duressInfo'); if(!el)return;
+  el.textContent = prefs.duressHash ? 'Ingesteld — opent een lege lokkluis' : 'Opent een lege lokkluis';
+  $('#btnDuress').textContent = prefs.duressHash ? 'Wijzig' : 'Instellen';
+}
+$('#btnDuress').addEventListener('click',()=>{
+  openSheet(`<div class="grab"></div><h3>Noodcode</h3>
+    <p class="hint" style="margin-bottom:14px">Een tweede cijfercode die op de rekenmachine een <b>lege lokkluis</b> opent in plaats van je echte video's. Handig als iemand je dwingt te ontgrendelen.</p>
+    <div class="field"><label>NOODCODE (alleen cijfers)</label><input id="duInput" type="number" inputmode="numeric" placeholder="••••"></div>
+    <div class="sheet-actions">${prefs.duressHash?'<button class="btn-ghost" id="duClear" style="color:var(--v-rose)">Verwijderen</button>':'<button class="btn-ghost" id="duCancel">Annuleer</button>'}<button class="btn-primary" id="duSave">Opslaan</button></div>`);
+  const c=$('#duCancel'); if(c)c.onclick=closeSheet;
+  const cl=$('#duClear'); if(cl)cl.onclick=()=>{delete prefs.duressHash;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Noodcode verwijderd');};
+  $('#duSave').onclick=async()=>{
+    const v=$('#duInput').value;
+    if(!/^\d{3,}$/.test(v)){toast('Kies minstens 3 cijfers');return;}
+    const h=await sha(v);
+    if(h===prefs.pinHash){toast('Mag niet gelijk zijn aan je echte code');return;}
+    prefs.duressHash=h;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Noodcode ingesteld ✓');
+  };
+});
+
+/* ---------- back-up: exporteren / terugzetten ---------- */
+function _encField(o){return o?{iv:_b64e(o.iv),data:_b64e(o.data),mime:o.mime}:null;}
+function _decField(o){return o?{iv:_b64d(o.iv),data:_b64d(o.data),mime:o.mime}:null;}
+async function serializeVideo(r){
+  const o=Object.assign({},r);
+  if(r.enc){
+    o.titleEnc=_encField(r.titleEnc); o.thumbEnc=_encField(r.thumbEnc);
+    if(r.type==='url') o.urlEnc=_encField(r.urlEnc); else o.blobEnc=_encField(r.blobEnc);
+  }else if(r.blob){
+    o.blob={__blob:true, mime:r.blob.type||'video/mp4', data:_b64e(await r.blob.arrayBuffer())};
+  }
+  return o;
+}
+function deserializeVideo(sv){
+  const o=Object.assign({},sv);
+  if(sv.enc){
+    o.titleEnc=_decField(sv.titleEnc); o.thumbEnc=_decField(sv.thumbEnc);
+    if(sv.type==='url') o.urlEnc=_decField(sv.urlEnc); else o.blobEnc=_decField(sv.blobEnc);
+  }else if(sv.blob && sv.blob.__blob){
+    o.blob=new Blob([_b64d(sv.blob.data)],{type:sv.blob.mime||'video/mp4'});
+  }
+  return o;
+}
+async function exportBackup(){
+  toast('Back-up maken…',true);
+  try{
+    const raw=(await allVideos())||[], albums=(await allAlbums())||[];
+    const p={pinHash:prefs.pinHash,duressHash:prefs.duressHash||null,kdfSalt:prefs.kdfSalt||null,wrapIv:prefs.wrapIv||null,wrappedKey:prefs.wrappedKey||null,autolock:prefs.autolock,autoplay:prefs.autoplay};
+    const parts=['{"format":"numa-backup","v":1,"exportedAt":'+Date.now()+',"prefs":'+JSON.stringify(p)+',"albums":'+JSON.stringify(albums)+',"videos":['];
+    for(let i=0;i<raw.length;i++){ parts.push((i?',':'')+JSON.stringify(await serializeVideo(raw[i]))); }
+    parts.push(']}');
+    const blob=new Blob(parts,{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='numa-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+    hideToast();toast('Back-up gedownload ✓');
+  }catch(e){hideToast();toast('Back-up mislukt');console.warn(e);}
+}
+async function importBackup(file){
+  let data; try{ data=JSON.parse(await file.text()); }catch(e){ toast('Ongeldig bestand'); return; }
+  if(!data||data.format!=='numa-backup'){ toast('Niet herkend als Numa-back-up'); return; }
+  if(!confirm('Terugzetten overschrijft je huidige kluis én de geheime code met die uit de back-up. Doorgaan?'))return;
+  toast('Terugzetten…',true);
+  try{
+    const p=data.prefs||{};
+    ['pinHash','duressHash','kdfSalt','wrapIv','wrappedKey'].forEach(k=>{ prefs[k]=p[k]!==undefined?p[k]:prefs[k]; });
+    if(p.autolock!==undefined)prefs.autolock=p.autolock; if(p.autoplay!==undefined)prefs.autoplay=p.autoplay;
+    savePrefs(prefs);
+    const d=await db();
+    await Promise.all([
+      new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
+      new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;})
+    ]);
+    for(const a of (data.albums||[])) await putAlbum(a);
+    for(const sv of (data.videos||[])) await putVideoRaw(deserializeVideo(sv));
+    hideToast();
+    toast('Teruggezet ✓ — open opnieuw met de code uit de back-up',false,5000);
+    setTimeout(lockVault,900);
+  }catch(e){hideToast();toast('Terugzetten mislukt');console.warn(e);}
+}
+$('#btnExport').addEventListener('click',exportBackup);
+$('#btnImport').addEventListener('click',()=>$('#importPick').click());
+$('#importPick').addEventListener('change',e=>{ if(e.target.files[0])importBackup(e.target.files[0]); e.target.value=''; });
+
 async function updateStorage(){
   const info=$('#storageInfo');
   try{
