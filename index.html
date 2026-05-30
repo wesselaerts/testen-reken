@@ -620,6 +620,7 @@ async function ensurePin(){
 
 /* ---------- versleuteling (envelope: random masterkey, gewikkeld door je pincode) ---------- */
 let MK=null;            // masterkey – alleen in geheugen tijdens een geopende sessie
+let SESSION_CODE=null;  // platte code – alleen in geheugen; voor delen tussen toestellen
 let decoyMode=false;    // true wanneer geopend met de noodcode (lokkluis)
 const KDF_ITER=150000;
 function _rand(n){return crypto.getRandomValues(new Uint8Array(n));}
@@ -1485,6 +1486,7 @@ return { reset, render };
    ================================================================= */
 async function openVault(code, decoy){
   decoyMode=!!decoy; MK=null;
+  SESSION_CODE = (!decoyMode && code!=null) ? code : null;
   $('#cover').classList.remove('active');
   $('#vault').classList.add('active');
   try{ if(!decoyMode && code!=null) await ensureCrypto(code); }catch(e){ console.warn(e); }
@@ -1494,7 +1496,8 @@ async function openVault(code, decoy){
 function lockVault(){
   closePlayer();
   closeAux();
-  MK=null; decoyMode=false; VIDEOS=[];
+  if(window.__camStop)try{window.__camStop();}catch(e){}
+  MK=null; SESSION_CODE=null; decoyMode=false; VIDEOS=[];
   $('#vault').classList.remove('active');
   $('#cover').classList.add('active');
   renderAll();
@@ -2055,9 +2058,11 @@ function openAddSheet(){
   openSheet(`
     <div class="grab"></div>
     <h3>Video toevoegen</h3>
+    <div class="sheet-item" id="aCamera"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Film opnemen<small>Direct & versleuteld in de kluis</small></div>
     <div class="sheet-item" id="aDevice"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="18" x2="15" y2="18"/></svg>Vanaf dit apparaat<small>Eén of meerdere video's</small></div>
     <div class="sheet-item" id="aUrl"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Via een link (URL)<small>Direct .mp4 / .webm adres</small></div>
   `);
+  $('#aCamera').onclick=()=>{closeSheet();openCamera();};
   $('#aDevice').onclick=()=>{closeSheet();$('#filePick').click();};
   $('#aUrl').onclick=()=>{closeSheet();urlSheet();};
 }
@@ -2079,11 +2084,13 @@ function videoMenu(id){
     <div class="sheet-item" id="mFav"><svg viewBox="0 0 24 24" fill="${v.favorite?'var(--v-rose)':'none'}" stroke-width="1.8"><path d="M12 21s-7-4.5-9.5-9C1 9 2.5 5 6 5c2 0 3 1 4 2 1-1 2-2 4-2 3.5 0 5 4 3.5 7-2.5 4.5-9.5 9-9.5 9z"/></svg>${v.favorite?'Uit favorieten':'Favoriet maken'}</div>
     <div class="sheet-item" id="mRename"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Naam wijzigen</div>
     <div class="sheet-item" id="mAlbum"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M6 7V5a2 2 0 0 1 2-2h3l2 2h5"/></svg>Verplaats naar album</div>
+    <div class="sheet-item" id="mShare"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>Versleuteld exporteren<small>Voor een ander toestel met dezelfde code</small></div>
     <div class="sheet-item danger" id="mDel"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>Verwijderen</div>`);
   $('#mPlay').onclick=()=>{closeSheet();openPlayer(id);};
   $('#mFav').onclick=async()=>{v.favorite=!v.favorite;await putVideo(v);await refreshData();renderAll();closeSheet();};
   $('#mRename').onclick=()=>renameSheet(v);
   $('#mAlbum').onclick=()=>albumPickSheet(v);
+  $('#mShare').onclick=()=>{closeSheet();shareExport([id]);};
   $('#mDel').onclick=async()=>{if(confirm('Deze video verwijderen?')){await delVideo(id);await refreshData();renderAll();updateStorage();closeSheet();toast('Verwijderd');}};
 }
 function renameSheet(v){
@@ -2359,6 +2366,298 @@ $('#btnWipe').addEventListener('click',async()=>{
   ]);
   await refreshData();renderAll();updateStorage();toast('Alles gewist');
 });
+
+/* =================================================================
+   CAMERA — lokaal filmen, direct versleuteld in de kluis
+   (de ruwe opname blijft alleen in het geheugen en gaat rechtstreeks
+    naar de versleutelde IndexedDB; nergens anders heen)
+   ================================================================= */
+(function injectCamShareCSS(){
+  const css=`
+  #camView{position:fixed;inset:0;z-index:200;background:#000;display:none;}
+  #camView.show{display:block;}
+  #camPrev{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;}
+  #camView .cam-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);z-index:3;}
+  #camView .cam-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:18px 30px calc(env(safe-area-inset-bottom) + 22px);z-index:3;}
+  #camView button{background:rgba(20,20,26,.5);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-family:inherit;}
+  #camView .cam-top button{width:38px;height:38px;flex:0 0 auto;}
+  #camView .cam-top button svg{width:20px;height:20px;}
+  #camView #camTimer{font-variant-numeric:tabular-nums;font-weight:600;font-size:15px;color:#fff;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:999px;}
+  #camView #camMic.off{color:#F0604D;border-color:rgba(240,96,77,.5);}
+  #camView .cam-aux{width:54px;height:54px;flex-direction:column;gap:2px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;}
+  #camView .cam-aux svg{width:22px;height:22px;}
+  #camView #camRec{width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid #fff;padding:0;}
+  #camView #camRec .dot{width:54px;height:54px;border-radius:50%;background:#F0604D;transition:all .2s ease;}
+  #camView.rec #camRec .dot{width:28px;height:28px;border-radius:9px;}
+  #camView .cam-hint{position:absolute;top:64px;left:0;right:0;text-align:center;color:rgba(255,255,255,.72);font-size:12px;z-index:3;pointer-events:none;}
+  #camView.rec .cam-hint,#camView.saving .cam-hint{display:none;}
+  #camView .cam-save{position:absolute;left:0;right:0;bottom:0;z-index:5;display:none;flex-direction:column;gap:12px;padding:20px 18px calc(env(safe-area-inset-bottom) + 20px);background:linear-gradient(0deg,rgba(8,7,10,.97),rgba(8,7,10,.7) 70%,transparent);}
+  #camView.saving .cam-save{display:flex;}
+  #camView.saving .cam-bottom{opacity:.2;pointer-events:none;}
+  #camView .cam-save input{height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;font-size:16px;padding:0 14px;outline:none;}
+  #camView .cam-save .row{display:flex;gap:10px;}
+  #camView .cam-save .row button{flex:1;height:46px;border-radius:12px;font-size:14px;font-weight:600;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;}
+  #camView .cam-save .row .save{background:linear-gradient(135deg,#fff,var(--v-gold,#F0C674));color:#08070A;border:none;}
+  .share-list{max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin:4px 0 14px;-webkit-overflow-scrolling:touch;}
+  .share-row{display:flex;align-items:center;gap:12px;padding:11px 6px;border-bottom:1px solid var(--v-border,rgba(255,255,255,.07));cursor:pointer;}
+  .share-row input{width:20px;height:20px;accent-color:var(--v-gold,#F0C674);flex:0 0 auto;}
+  .share-row span{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}`;
+  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+})();
+
+const CAM={view:null,stream:null,rec:null,chunks:[],recording:false,startTs:0,timer:null,mime:'',
+  devices:[],lensIdx:0,deviceId:null,facing:'environment',mic:true,pending:null};
+
+function camPickMime(){
+  const c=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(const m of c){ try{ if(window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }catch(e){} }
+  return '';
+}
+function camConstraints(){
+  const v = CAM.deviceId ? {deviceId:{exact:CAM.deviceId}} : {facingMode:{ideal:CAM.facing}};
+  v.width={ideal:1920}; v.height={ideal:1080}; v.aspectRatio={ideal:16/9};   // breed beeld (16:9, HD)
+  return {video:v, audio:CAM.mic};
+}
+function buildCamView(){
+  if(CAM.view) return;
+  const d=document.createElement('div'); d.id='camView';
+  d.innerHTML=
+    '<video id="camPrev" playsinline webkit-playsinline autoplay muted></video>'+
+    '<div class="cam-hint" id="camHint">Tik op de rode knop om op te nemen</div>'+
+    '<div class="cam-top">'+
+      '<button id="camClose" aria-label="Sluiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>'+
+      '<span id="camTimer">0:00</span>'+
+      '<button id="camMic" aria-label="Microfoon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg></button>'+
+    '</div>'+
+    '<div class="cam-bottom">'+
+      '<button class="cam-aux" id="camLens" aria-label="Lens"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span>Lens</span></button>'+
+      '<button id="camRec" aria-label="Opnemen"><span class="dot"></span></button>'+
+      '<button class="cam-aux" id="camFlip" aria-label="Camera wisselen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3-3 3 3"/><path d="M6 5v6a5 5 0 0 0 5 5h2"/><path d="M21 16l-3 3-3-3"/><path d="M18 19v-6a5 5 0 0 0-5-5h-2"/></svg><span>Draai</span></button>'+
+    '</div>'+
+    '<div class="cam-save">'+
+      '<input id="camName" type="text" maxlength="60" placeholder="Naam van de opname" autocomplete="off" autocorrect="off" spellcheck="false">'+
+      '<div class="row"><button id="camDiscard">Opnieuw</button><button class="save" id="camSaveBtn">Bewaar in kluis</button></div>'+
+    '</div>';
+  document.body.appendChild(d); CAM.view=d;
+  $('#camClose').onclick=()=>camStop(true);
+  $('#camMic').onclick=camMicToggle;
+  $('#camLens').onclick=camLensCycle;
+  $('#camFlip').onclick=camFlip;
+  $('#camRec').onclick=()=>{ if(CAM.recording) camRecStop(); else camRecStart(); };
+  $('#camSaveBtn').onclick=camSave;
+  $('#camDiscard').onclick=camDiscard;
+}
+async function camStart(){
+  // bestaande tracks vrijgeven, overlay laten staan
+  if(CAM.stream){ CAM.stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); CAM.stream=null; }
+  try{
+    CAM.stream=await navigator.mediaDevices.getUserMedia(camConstraints());
+  }catch(e){
+    try{ CAM.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:CAM.facing}},audio:CAM.mic}); }
+    catch(e2){ try{ CAM.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:CAM.mic}); }catch(e3){ toast('Geen toegang tot de camera'); return false; } }
+  }
+  const prev=$('#camPrev'); prev.srcObject=CAM.stream; prev.muted=true;
+  try{ await prev.play(); }catch(_){}
+  try{ const ds=await navigator.mediaDevices.enumerateDevices(); CAM.devices=ds.filter(d=>d.kind==='videoinput'); }catch(_){}
+  $('#camMic').classList.toggle('off',!CAM.mic);
+  return true;
+}
+function camStop(closeOverlay){
+  if(CAM.recording && CAM.rec){ try{ CAM.rec.stop(); }catch(_){} }
+  CAM.recording=false; CAM.chunks=[]; CAM.pending=null;
+  clearInterval(CAM.timer); CAM.timer=null;
+  if(CAM.stream){ CAM.stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); CAM.stream=null; }
+  const prev=$('#camPrev'); if(prev){ try{ prev.srcObject=null; }catch(_){} }
+  if(CAM.view){ CAM.view.classList.remove('rec'); CAM.view.classList.remove('saving'); $('#camTimer').textContent='0:00'; }
+  if(closeOverlay && CAM.view){ CAM.view.classList.remove('show'); }
+}
+window.__camStop=()=>{ if(CAM.view&&CAM.view.classList.contains('show')) camStop(true); };
+async function camFlip(){ if(CAM.recording){ toast('Stop eerst de opname'); return; } CAM.deviceId=null; CAM.facing=(CAM.facing==='environment')?'user':'environment'; await camStart(); }
+async function camLensCycle(){
+  if(CAM.recording){ toast('Stop eerst de opname'); return; }
+  if(!CAM.devices||CAM.devices.length<2){ toast('Geen extra lens beschikbaar'); return; }
+  CAM.lensIdx=((CAM.lensIdx||0)+1)%CAM.devices.length;
+  CAM.deviceId=CAM.devices[CAM.lensIdx].deviceId;
+  const lab=(CAM.devices[CAM.lensIdx].label||'').toLowerCase();
+  await camStart();
+  toast(/ultra|wide|groothoek|0\.5/.test(lab)?'Groothoeklens':('Lens '+(CAM.lensIdx+1)+'/'+CAM.devices.length));
+}
+async function camMicToggle(){ if(CAM.recording){ toast('Stop eerst de opname'); return; } CAM.mic=!CAM.mic; await camStart(); toast(CAM.mic?'Microfoon aan':'Microfoon uit'); }
+function camRecStart(){
+  if(!CAM.stream){ toast('Camera niet klaar'); return; }
+  CAM.mime=camPickMime();
+  try{ CAM.rec = CAM.mime ? new MediaRecorder(CAM.stream,{mimeType:CAM.mime}) : new MediaRecorder(CAM.stream); }
+  catch(e){ try{ CAM.rec=new MediaRecorder(CAM.stream); CAM.mime=CAM.rec.mimeType||''; }catch(e2){ toast('Opnemen niet ondersteund op dit toestel'); return; } }
+  CAM.chunks=[];
+  CAM.rec.ondataavailable=e=>{ if(e.data&&e.data.size) CAM.chunks.push(e.data); };
+  CAM.rec.onstop=camRecFinish;
+  CAM.startTs=Date.now();
+  try{ CAM.rec.start(1000); }catch(e){ toast('Opnemen kon niet starten'); return; }
+  CAM.recording=true; CAM.view.classList.add('rec');
+  CAM.timer=setInterval(()=>{ $('#camTimer').textContent=fmtTime((Date.now()-CAM.startTs)/1000); },250);
+}
+function camRecStop(){ if(CAM.recording && CAM.rec){ try{ CAM.rec.stop(); }catch(_){} } }
+function camRecFinish(){
+  CAM.recording=false; clearInterval(CAM.timer); CAM.timer=null;
+  if(CAM.view) CAM.view.classList.remove('rec');
+  const dur=(Date.now()-CAM.startTs)/1000;
+  const type=(CAM.mime||'').split(';')[0] || (CAM.chunks[0]&&CAM.chunks[0].type) || 'video/mp4';
+  const blob=new Blob(CAM.chunks,{type}); CAM.chunks=[];
+  if(!blob.size || dur<0.4){ toast('Opname te kort'); return; }
+  let thumb=null;
+  try{
+    const prev=$('#camPrev'); const vw=prev.videoWidth||1280, vh=prev.videoHeight||720;
+    const c=document.createElement('canvas'); const w=320,h=Math.round(320*(vh/vw||0.5625))||180; c.width=w;c.height=h;
+    c.getContext('2d').drawImage(prev,0,0,w,h); thumb=c.toDataURL('image/jpeg',0.6);
+  }catch(_){}
+  CAM.pending={blob,dur,thumb,mime:type};
+  const now=new Date();
+  $('#camName').value='Opname '+now.toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit'})+' '+now.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  CAM.view.classList.add('saving');
+}
+async function camSave(){
+  const p=CAM.pending; if(!p) return;
+  const title=($('#camName').value||'').trim() || ('Opname '+fmtTime(p.dur));
+  toast('Opslaan…',true);
+  const rec={ id:uid(), type:'file', title, blob:p.blob, mime:p.mime||'video/mp4', size:p.blob.size,
+    duration:p.dur||0, thumb:p.thumb, addedAt:Date.now(), views:0, lastViewedAt:0, favorite:false, album:null, resume:0, decoy:decoyMode };
+  try{ await putVideo(rec); }   // <- versleutelt blok-voor-blok rechtstreeks in IndexedDB
+  catch(e){ hideToast(); toast('Opslaan mislukt'); console.warn(e); return; }
+  CAM.pending=null; CAM.view.classList.remove('saving');
+  await refreshData(); renderAll(); updateStorage();
+  $('#camTimer').textContent='0:00';
+  hideToast(); toast('Opname versleuteld bewaard ✓');
+}
+function camDiscard(){ CAM.pending=null; if(CAM.view) CAM.view.classList.remove('saving'); }
+async function openCamera(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('Camera niet beschikbaar in deze browser'); return; }
+  if(typeof MediaRecorder==='undefined'){ toast('Opnemen wordt niet ondersteund op dit toestel'); return; }
+  buildCamView();
+  CAM.deviceId=null; CAM.facing='environment'; CAM.pending=null; CAM.lensIdx=0;
+  CAM.view.classList.remove('saving'); CAM.view.classList.remove('rec');
+  $('#camTimer').textContent='0:00';
+  CAM.view.classList.add('show');
+  const ok=await camStart();
+  if(!ok) camStop(true);
+}
+
+/* =================================================================
+   VERSLEUTELD DELEN — exporteer geselecteerde video's; import voegt toe
+   (alleen leesbaar op een toestel met DEZELFDE geheime code: de sleutel
+    wordt uit de code afgeleid; AES-GCM weigert een verkeerde code)
+   ================================================================= */
+async function deriveTransport(code,salt,iter){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(code),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter||KDF_ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function materializeBlob(raw){
+  if(!raw || raw.type==='url') return null;
+  if(raw.enc && raw.blobEnc && raw.blobEnc.chunked) return await loadChunkedBlob(raw.id, raw.blobEnc);
+  if(raw.enc && raw.blobEnc) return await decBlobToBlob(raw.blobEnc);
+  return raw.blob||null;
+}
+function shareSelectSheet(){
+  const list=VIDEOS.filter(v=>v.type==='file'||v.type==='url');
+  if(!list.length){ toast('Geen video\u2019s om te delen'); return; }
+  const rows=list.map(v=>`<label class="share-row"><input type="checkbox" value="${v.id}"><span>${escapeHtml(v.title)}</span></label>`).join('');
+  openSheet(`<div class="grab"></div><h3>Versleuteld delen</h3>
+    <p style="font-size:12.5px;color:var(--v-muted,rgba(255,255,255,.5));margin:0 0 6px;line-height:1.5;">Kies de video\u2019s die je wilt meenemen. Het bestand is versleuteld en kan <b>alleen</b> geopend worden op een toestel met <b>dezelfde geheime code</b>. Bij importeren komen ze <b>bovenop</b> de bestaande kluis — je wist niets.</p>
+    <div class="share-list">${rows}</div>
+    <div class="sheet-actions"><button class="btn-ghost" id="shCancel">Annuleer</button><button class="btn-primary" id="shGo">Exporteer</button></div>`);
+  $('#shCancel').onclick=closeSheet;
+  $('#shGo').onclick=()=>{ const ids=$$('.share-list input:checked').map(c=>c.value); if(!ids.length){ toast('Selecteer minstens één video'); return; } closeSheet(); shareExport(ids); };
+}
+async function shareExport(ids){
+  if(!ids||!ids.length){ toast('Niets geselecteerd'); return; }
+  if(!SESSION_CODE){ toast('Open de kluis met je eigen code'); return; }
+  toast('Versleuteld exporteren…',true);
+  try{
+    const salt=_rand(16), iter=KDF_ITER, TK=await deriveTransport(SESSION_CODE,salt,iter);
+    const tenc=async(buf)=>{ const iv=_rand(12); const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},TK,buf); return {iv:_b64e(iv),data:_b64e(data)}; };
+    const check=await tenc(new TextEncoder().encode('numa-share-ok'));
+    const parts=[JSON.stringify({format:'numa-share',v:1,salt:_b64e(salt),iter,check,count:ids.length,exportedAt:Date.now()})+'\n'];
+    let done=0;
+    for(const id of ids){
+      const raw=await getVideo(id); if(!raw) continue;
+      const dec=await decodeRecord(raw);            // titel/thumb/url in klare tekst (geheugen)
+      let n=0;
+      if(raw.type!=='url'){
+        const blob=await materializeBlob(raw);      // inhoud ontsleuteld (geheugen)
+        const size=blob?blob.size:0;
+        for(let off=0; off<size; off+=ENC_CHUNK){
+          const ab=await blob.slice(off,Math.min(off+ENC_CHUNK,size)).arrayBuffer();
+          const e=await tenc(ab);
+          parts.push(new Blob([JSON.stringify({k:'c',id,i:n,iv:e.iv,d:e.data})+'\n'])); n++;
+        }
+      }
+      const r={ id, type:raw.type, mime:(raw.blobEnc&&raw.blobEnc.mime)||raw.mime||'video/mp4', size:raw.size||0, duration:raw.duration||0, n };
+      r.titleEnc=await tenc(new TextEncoder().encode(dec.title||''));
+      if(dec.thumb) r.thumbEnc=await tenc(new TextEncoder().encode(dec.thumb));
+      if(raw.type==='url') r.urlEnc=await tenc(new TextEncoder().encode(dec.url||''));
+      parts.push(JSON.stringify({k:'v',r})+'\n');
+      done++; toast('Versleuteld exporteren… '+done+'/'+ids.length,true);
+    }
+    const out=new Blob(parts,{type:'application/octet-stream'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(out);
+    a.download='numa-deel-'+new Date().toISOString().slice(0,10)+'.numa';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    hideToast(); toast(ids.length+' video'+(ids.length===1?'':'\u2019s')+' versleuteld geëxporteerd ✓');
+  }catch(e){ hideToast(); toast('Exporteren mislukt'); console.warn(e); }
+}
+async function shareImport(file){
+  if(!SESSION_CODE){ toast('Open de kluis met je eigen code'); return; }
+  let head=''; try{ head=await file.slice(0,8192).text(); }catch(e){ try{ head=(await file.text()).slice(0,8192); }catch(_){} }
+  let hdr; try{ const nl=head.indexOf('\n'); hdr=JSON.parse(head.slice(0, nl<0?head.length:nl)); }catch(e){ toast('Niet herkend als gedeeld bestand'); return; }
+  if(!hdr || hdr.format!=='numa-share'){ toast('Niet herkend als gedeelde video\u2019s'); return; }
+  const salt=_b64d(hdr.salt), iter=hdr.iter||KDF_ITER, TK=await deriveTransport(SESSION_CODE,salt,iter);
+  const tdec=async(o)=>crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(o.iv)},TK,_b64d(o.data));
+  try{ const t=new TextDecoder().decode(await tdec(hdr.check)); if(t!=='numa-share-ok') throw 0; }
+  catch(e){ toast('Andere geheime code — dit bestand kan alleen met dezelfde code geopend worden',false,5200); return; }
+  toast('Importeren…',true);
+  try{
+    const chunks={}; let count=0, skippedHeader=false;
+    const handle=async(line)=>{
+      const o=JSON.parse(line);
+      if(!skippedHeader && o.format==='numa-share'){ skippedHeader=true; return; }
+      if(o.k==='c'){ (chunks[o.id]=chunks[o.id]||[])[o.i]=new Blob([await tdec({iv:o.iv,data:o.d})]); }
+      else if(o.k==='v'){
+        const m=o.r;
+        const title=new TextDecoder().decode(await tdec(m.titleEnc));
+        let thumb=null; if(m.thumbEnc){ try{ thumb=new TextDecoder().decode(await tdec(m.thumbEnc)); }catch(_){} }
+        const rec={ id:uid(), type:m.type, title:title||'Gedeelde video', mime:m.mime||'video/mp4', size:m.size||0,
+          duration:m.duration||0, thumb, addedAt:Date.now(), views:0, lastViewedAt:0, favorite:false, album:null, resume:0, decoy:decoyMode };
+        if(m.type==='url'){ let url=''; if(m.urlEnc){ try{ url=new TextDecoder().decode(await tdec(m.urlEnc)); }catch(_){} } rec.url=url; }
+        else { const arr=(chunks[m.id]||[]).filter(Boolean); rec.blob=new Blob(arr,{type:m.mime||'video/mp4'}); rec.size=rec.blob.size; delete chunks[m.id]; }
+        await putVideo(rec);     // <- her-versleuteld onder de eigen sleutel van DIT toestel + toegevoegd
+        count++; toast('Importeren… '+count,true);
+      }
+    };
+    if(file.stream){
+      const reader=file.stream().getReader(); const dc=new TextDecoder(); let buf='';
+      for(;;){ const {value,done}=await reader.read(); if(value) buf+=dc.decode(value,{stream:true});
+        let nl; while((nl=buf.indexOf('\n'))>=0){ const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1); if(line) await handle(line); }
+        if(done) break; }
+      buf+=dc.decode(); const last=buf.trim(); if(last) await handle(last);
+    }else{
+      const text=await file.text(); for(const line of text.split('\n')){ const l=line.trim(); if(l) await handle(l); }
+    }
+    await refreshData(); renderAll(); updateStorage();
+    hideToast(); toast(count+' video'+(count===1?'':'\u2019s')+' toegevoegd ✓');
+  }catch(e){ hideToast(); toast('Importeren mislukt — controleer of het bestand volledig is'); console.warn(e); }
+}
+/* extra instellingen-rijen voor delen/importeren */
+(function injectShareSettings(){
+  const page=$('#pageSettings'), before=$('#rowDeleteAll'); if(!page||!before) return;
+  const mk=(labelHtml,btnText,onClick)=>{ const r=document.createElement('div'); r.className='set-row';
+    r.innerHTML='<div class="lab">'+labelHtml+'</div>';
+    const b=document.createElement('button'); b.className='btn-ghost'; b.style.cssText='padding:9px 14px;border-radius:11px;font-size:13px;'; b.textContent=btnText; b.onclick=onClick; r.appendChild(b); return r; };
+  page.insertBefore(mk('Video\u2019s delen (versleuteld)<small>Exporteer geselecteerde video\u2019s voor een ander toestel</small>','Selecteer',shareSelectSheet), before);
+  page.insertBefore(mk('Gedeelde video\u2019s importeren<small>Voegt toe aan je kluis — vereist dezelfde code</small>','Kies bestand',()=>$('#sharePick').click()), before);
+  const inp=document.createElement('input'); inp.type='file'; inp.id='sharePick'; inp.accept='.numa,.json,application/octet-stream,application/json'; inp.style.display='none';
+  inp.addEventListener('change',e=>{ if(e.target.files[0]) shareImport(e.target.files[0]); e.target.value=''; });
+  page.appendChild(inp);
+})();
 
 /* =================================================================
    INIT
