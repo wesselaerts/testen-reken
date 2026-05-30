@@ -2213,44 +2213,39 @@ async function restoreChunks(sv){
   }
 }
 /* schrijf één video naar de back-up als losse Blob-delen (houdt geheugen laag) */
-async function streamVideo(r, parts){
+function _metaCommon(r){return {id:r.id,type:r.type,mime:r.mime,size:r.size||0,duration:r.duration||0,addedAt:r.addedAt,views:r.views||0,lastViewedAt:r.lastViewedAt||0,favorite:!!r.favorite,album:r.album||null,resume:r.resume||0,decoy:!!r.decoy};}
+/* één video naar de back-up als losse regels (chunk-regels + één record-regel) */
+async function streamVideoLines(r, parts){
   if(r.enc){
     if(r.type==='url'){
-      const o={id:r.id,type:r.type,mime:r.mime,size:r.size||0,duration:r.duration||0,addedAt:r.addedAt,views:r.views||0,lastViewedAt:r.lastViewedAt||0,favorite:!!r.favorite,album:r.album||null,resume:r.resume||0,decoy:!!r.decoy,enc:true,titleEnc:_encField(r.titleEnc),thumbEnc:_encField(r.thumbEnc),urlEnc:_encField(r.urlEnc)};
-      parts.push(JSON.stringify(o)); return;
+      const m=_metaCommon(r); m.enc=true; m.titleEnc=_encField(r.titleEnc); m.thumbEnc=_encField(r.thumbEnc); m.urlEnc=_encField(r.urlEnc);
+      parts.push(JSON.stringify({k:'v',r:m})+'\n'); return;
     }
     if(r.blobEnc && r.blobEnc.chunked){
-      const meta={id:r.id,type:r.type,mime:r.mime,size:r.size||0,duration:r.duration||0,addedAt:r.addedAt,views:r.views||0,lastViewedAt:r.lastViewedAt||0,favorite:!!r.favorite,album:r.album||null,resume:r.resume||0,decoy:!!r.decoy,enc:true,titleEnc:_encField(r.titleEnc),thumbEnc:_encField(r.thumbEnc),blobEnc:{chunked:true,n:r.blobEnc.n,mime:r.blobEnc.mime,size:r.blobEnc.size}};
-      parts.push(JSON.stringify(meta).slice(0,-1)+',"chunkData":[');
-      for(let j=0;j<r.blobEnc.n;j++){
-        const c=await idbGetChunk(r.id+'#'+j);
-        const obj=c?{iv:_b64e(c.iv),data:_b64e(c.data)}:null;
-        parts.push(new Blob([(j?',':'')+JSON.stringify(obj)]));
-      }
-      parts.push(']}'); return;
+      for(let j=0;j<r.blobEnc.n;j++){ const c=await idbGetChunk(r.id+'#'+j); if(c) parts.push(new Blob([JSON.stringify({k:'c',id:r.id,i:j,iv:_b64e(c.iv),d:_b64e(c.data)})+'\n'])); }
+      const m=_metaCommon(r); m.enc=true; m.titleEnc=_encField(r.titleEnc); m.thumbEnc=_encField(r.thumbEnc); m.blobEnc={chunked:true,n:r.blobEnc.n,mime:r.blobEnc.mime,size:r.blobEnc.size};
+      parts.push(JSON.stringify({k:'v',r:m})+'\n'); return;
     }
-    // legacy enkelvoudig versleuteld
-    const o={id:r.id,type:r.type,mime:r.mime,size:r.size||0,duration:r.duration||0,addedAt:r.addedAt,views:r.views||0,lastViewedAt:r.lastViewedAt||0,favorite:!!r.favorite,album:r.album||null,resume:r.resume||0,decoy:!!r.decoy,enc:true,titleEnc:_encField(r.titleEnc),thumbEnc:_encField(r.thumbEnc),blobEnc:_encField(r.blobEnc)};
-    parts.push(JSON.stringify(o)); return;
+    // legacy enkelvoudig versleuteld -> als één blok, importeren als chunked(n:1)
+    if(r.blobEnc){ parts.push(new Blob([JSON.stringify({k:'c',id:r.id,i:0,iv:_b64e(r.blobEnc.iv),d:_b64e(r.blobEnc.data)})+'\n'])); }
+    const m=_metaCommon(r); m.enc=true; m.titleEnc=_encField(r.titleEnc); m.thumbEnc=_encField(r.thumbEnc); m.blobEnc={chunked:true,n:1,mime:(r.blobEnc&&r.blobEnc.mime)||r.mime||'video/mp4',size:r.size||0};
+    parts.push(JSON.stringify({k:'v',r:m})+'\n'); return;
   }
-  // onversleuteld (ouder item): blob in stukjes van 3 MB streamen
-  if(r.blob){
-    const meta={id:r.id,type:r.type,mime:r.mime,size:r.size||0,duration:r.duration||0,addedAt:r.addedAt,views:r.views||0,lastViewedAt:r.lastViewedAt||0,favorite:!!r.favorite,album:r.album||null,resume:r.resume||0,decoy:!!r.decoy,title:r.title||'',thumb:r.thumb||null};
-    parts.push(JSON.stringify(meta).slice(0,-1)+',"blob":{"__blob":true,"mime":'+JSON.stringify(r.blob.type||'video/mp4')+',"data":"');
+  if(r.blob){ // onversleuteld ouder item: blob in stukjes van 3 MB
     const CH=3*1024*1024, size=r.blob.size||0;
-    for(let off=0;off<size;off+=CH){ const buf=await r.blob.slice(off,Math.min(off+CH,size)).arrayBuffer(); parts.push(new Blob([_b64e(buf)])); }
-    parts.push('"}}'); return;
+    for(let off=0;off<size;off+=CH){ const buf=await r.blob.slice(off,Math.min(off+CH,size)).arrayBuffer(); parts.push(new Blob([JSON.stringify({k:'b',id:r.id,d:_b64e(buf)})+'\n'])); }
+    const m=_metaCommon(r); m.title=r.title||''; m.thumb=r.thumb||null; m.__plainmime=r.blob.type||'video/mp4';
+    parts.push(JSON.stringify({k:'v',r:m})+'\n'); return;
   }
-  parts.push(JSON.stringify(r));
+  parts.push(JSON.stringify({k:'v',r:r})+'\n');
 }
 async function exportBackup(){
   toast('Back-up maken…',true);
   try{
     const raw=(await allVideos())||[], albums=(await allAlbums())||[];
     const p={pinHash:prefs.pinHash,duressHash:prefs.duressHash||null,kdfSalt:prefs.kdfSalt||null,wrapIv:prefs.wrapIv||null,wrappedKey:prefs.wrappedKey||null,autolock:prefs.autolock,autoplay:prefs.autoplay};
-    const parts=['{"format":"numa-backup","v":2,"exportedAt":'+Date.now()+',"prefs":'+JSON.stringify(p)+',"albums":'+JSON.stringify(albums)+',"videos":['];
-    for(let i=0;i<raw.length;i++){ if(i) parts.push(','); await streamVideo(raw[i], parts); toast('Back-up maken… '+(i+1)+'/'+raw.length,true); }
-    parts.push(']}');
+    const parts=[JSON.stringify({format:'numa-backup',v:3,exportedAt:Date.now(),prefs:p,albums:albums})+'\n'];
+    for(let i=0;i<raw.length;i++){ await streamVideoLines(raw[i], parts); toast('Back-up maken… '+(i+1)+'/'+raw.length,true); }
     const blob=new Blob(parts,{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -2260,25 +2255,60 @@ async function exportBackup(){
     hideToast();toast('Back-up gedownload ✓');
   }catch(e){hideToast();toast('Back-up mislukt');console.warn(e);}
 }
+function _applyBackupPrefs(p){
+  ['pinHash','duressHash','kdfSalt','wrapIv','wrappedKey'].forEach(k=>{ prefs[k]=p[k]!==undefined?p[k]:prefs[k]; });
+  if(p.autolock!==undefined)prefs.autolock=p.autolock; if(p.autoplay!==undefined)prefs.autoplay=p.autoplay;
+  savePrefs(prefs);
+}
+async function _clearStores(){
+  const d=await db();
+  await Promise.all([
+    new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
+    new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;}),
+    new Promise(r=>{const t=d.transaction('blobs','readwrite');t.objectStore('blobs').clear();t.oncomplete=r;})
+  ]);
+}
+async function importStream(file){
+  if(!file.stream){ return importWhole(file); }
+  const reader=file.stream().getReader(); const dec=new TextDecoder();
+  let buf='', headerDone=false, plain={}, count=0;
+  const handle=async(line)=>{
+    const o=JSON.parse(line);
+    if(!headerDone && o.format==='numa-backup'){ _applyBackupPrefs(o.prefs||{}); await _clearStores(); for(const a of (o.albums||[])) await putAlbum(a); headerDone=true; return; }
+    if(o.k==='c'){ await idbPutChunk(o.id+'#'+o.i, {iv:_b64d(o.iv), data:_b64d(o.d).buffer}); }
+    else if(o.k==='b'){ (plain[o.id]=plain[o.id]||[]).push(new Blob([_b64d(o.d)])); }
+    else if(o.k==='v'){
+      const r=o.r;
+      if(r.__plainmime){ r.blob=new Blob(plain[r.id]||[],{type:r.__plainmime}); delete r.__plainmime; delete plain[r.id]; }
+      else if(r.enc){ if(r.titleEnc)r.titleEnc=_decField(r.titleEnc); if(r.thumbEnc)r.thumbEnc=_decField(r.thumbEnc); if(r.type==='url'&&r.urlEnc)r.urlEnc=_decField(r.urlEnc); }
+      await putVideoRaw(r); count++; toast('Terugzetten… '+count,true);
+    }
+  };
+  for(;;){
+    const {value,done}=await reader.read();
+    if(value) buf+=dec.decode(value,{stream:true});
+    let nl;
+    while((nl=buf.indexOf('\n'))>=0){ const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1); if(line) await handle(line); }
+    if(done) break;
+  }
+  buf+=dec.decode(); const last=buf.trim(); if(last) await handle(last);
+}
+async function importWhole(file){
+  const data=JSON.parse(await file.text());
+  _applyBackupPrefs(data.prefs||{});
+  await _clearStores();
+  for(const a of (data.albums||[])) await putAlbum(a);
+  const vids=data.videos||[]; data.videos=null;
+  for(let i=0;i<vids.length;i++){ const sv=vids[i]; await restoreChunks(sv); await putVideoRaw(deserializeVideo(sv)); sv.chunkData=null; sv.blob=null; vids[i]=null; toast('Terugzetten… '+(i+1)+'/'+vids.length,true); }
+}
 async function importBackup(file){
-  let data; try{ data=JSON.parse(await file.text()); }catch(e){ toast('Ongeldig bestand'); return; }
-  if(!data||data.format!=='numa-backup'){ toast('Niet herkend als Numa-back-up'); return; }
+  let head=''; try{ head=await file.slice(0,512).text(); }catch(e){ try{ head=(await file.text()).slice(0,512); }catch(_){ } }
+  if(!/numa-backup/.test(head)){ toast('Niet herkend als Numa-back-up'); return; }
+  const isV3=/"v"\s*:\s*3/.test(head);
   if(!confirm('Terugzetten overschrijft je huidige kluis én de geheime code met die uit de back-up. Doorgaan?'))return;
   toast('Terugzetten…',true);
   try{
-    const p=data.prefs||{};
-    ['pinHash','duressHash','kdfSalt','wrapIv','wrappedKey'].forEach(k=>{ prefs[k]=p[k]!==undefined?p[k]:prefs[k]; });
-    if(p.autolock!==undefined)prefs.autolock=p.autolock; if(p.autoplay!==undefined)prefs.autoplay=p.autoplay;
-    savePrefs(prefs);
-    const d=await db();
-    await Promise.all([
-      new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
-      new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;}),
-      new Promise(r=>{const t=d.transaction('blobs','readwrite');t.objectStore('blobs').clear();t.oncomplete=r;})
-    ]);
-    for(const a of (data.albums||[])) await putAlbum(a);
-    const vids=data.videos||[]; data.videos=null;
-    for(let i=0;i<vids.length;i++){ const sv=vids[i]; await restoreChunks(sv); await putVideoRaw(deserializeVideo(sv)); sv.chunkData=null; sv.blob=null; vids[i]=null; toast('Terugzetten… '+(i+1)+'/'+vids.length,true); }
+    if(isV3) await importStream(file); else await importWhole(file);
     hideToast();
     toast('Teruggezet ✓ — open opnieuw met de code uit de back-up',false,5000);
     setTimeout(lockVault,900);
