@@ -13,11 +13,11 @@
 <meta name="apple-mobile-web-app-title" content="Numa" />
 <meta name="theme-color" content="#0f1115" />
 <link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%231b73e8'/%3E%3Ctext x='90' y='126' font-family='Helvetica,Arial' font-size='110' font-weight='700' fill='white' text-anchor='middle'%3E%C3%B7%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20180%20180%27%3E%3Crect%20width=%27180%27%20height=%27180%27%20rx=%2740%27%20fill=%27%231f7aad%27/%3E%3Crect%20x=%2752%27%20y=%2728%27%20width=%2776%27%20height=%27124%27%20rx=%2714%27%20fill=%27%23f4f7fa%27/%3E%3Crect%20x=%2760%27%20y=%2738%27%20width=%2760%27%20height=%2724%27%20rx=%275%27%20fill=%27%2312202a%27/%3E%3Crect%20x=%2766%27%20y=%2746%27%20width=%2730%27%20height=%276%27%20rx=%273%27%20fill=%27%237fe3c4%27/%3E%3Cg%20fill=%27%23e3e9f0%27%3E%3Crect%20x=%2760%27%20y=%2772%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%2782%27%20y=%2772%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%27104%27%20y=%2772%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%2760%27%20y=%27100%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%2782%27%20y=%27100%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%27104%27%20y=%27100%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%2760%27%20y=%27128%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3Crect%20x=%2782%27%20y=%27128%27%20width=%2716%27%20height=%2718%27%20rx=%274%27/%3E%3C/g%3E%3Crect%20x=%27104%27%20y=%27128%27%20width=%2716%27%20height=%2718%27%20rx=%274%27%20fill=%27%2316a36a%27/%3E%3C/svg%3E" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600;700&family=Archivo:ital,wght@0,500;0,700;1,500&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet" />
 
 <style>
 /* ============================== TOKENS ============================== */
@@ -66,94 +66,108 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .app{position:fixed;inset:0;height:100%;display:none;flex-direction:column;}
 .app.active{display:flex;}
 
-/* ============================== COVER: TI-84 PLUS ============================== */
+/* ============================== COVER: TI-30XB MULTIVIEW ============================== */
+:root{
+  --frame:#6b7178; --frame-edge:#4c5157; --face:#f2f3f4; --face-shadow:#d7dadd;
+  --lcd:#aab6a0; --lcd-2:#9fac95; --lcd-ink:#1b1f16;
+  --keyw:#fbfcfc; --keyw-edge:#cdd1d5; --keyw-ink:#33373d;
+  --keyd-top:#5a5f66; --keyd-bot:#3f444a; --keyd-ink:#ffffff;
+  --blue:#2f8ac6; --teal:#2c83c4; --brand-blue:#1d6fb0; --red:#d51f29;
+}
 #cover{
-  background:radial-gradient(120% 80% at 50% 0%,#23252b,#15161a 70%);
-  padding:calc(var(--safe-t) + 8px) 0 var(--safe-b);
-  overflow-y:auto;align-items:center;
+  background:#202327;
+  padding:calc(var(--safe-t) + 8px) 8px var(--safe-b);
+  overflow:hidden;align-items:stretch;
 }
-.ti{
-  width:100%;max-width:430px;margin:0 auto;flex:1;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,#43464d,#303237 18%,#2b2d32 100%);
-  border-radius:26px 26px 30px 30px;
-  box-shadow:0 18px 50px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -2px 6px rgba(0,0,0,.4);
-  padding:14px 14px 18px;min-height:0;border:1px solid #1c1d21;
+#cover .device{
+  width:100%;max-width:430px;margin:0 auto;flex:1;min-height:0;
+  display:flex;flex-direction:column;position:relative;
+  background:linear-gradient(180deg,#777d84 0%,var(--frame) 18%,var(--frame) 82%,var(--frame-edge) 100%);
+  border-radius:34px;padding:14px 14px 18px;
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.25), inset 0 -3px 6px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5);
+  overflow:hidden;
 }
-.ti-head{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 8px;}
-.ti-wordmark{font-family:"Outfit";font-weight:700;font-size:11px;letter-spacing:.5px;color:#cfd2d8;}
-.ti-wordmark small{display:block;font-weight:400;font-size:8px;letter-spacing:1.5px;color:#8d9098;text-transform:uppercase;}
-.ti-led{width:7px;height:7px;border-radius:50%;background:#5b6;box-shadow:0 0 6px #6c7;opacity:.8;}
-
-/* LCD screen */
-.ti-screen-wrap{
-  background:linear-gradient(180deg,#15161a,#202228);border-radius:10px;padding:9px;
-  box-shadow:inset 0 2px 8px rgba(0,0,0,.8);margin-bottom:12px;border:1px solid #0c0d0f;
+#cover .face{
+  background:var(--face);border-radius:24px 24px 14px 14px;
+  flex:1;display:flex;flex-direction:column;padding:10px 12px 12px;
+  box-shadow:inset 0 1px 0 #fff, inset 0 -2px 6px var(--face-shadow), 0 1px 2px rgba(0,0,0,.2);min-height:0;
 }
-.ti-screen{
-  background:#a9b596;border-radius:4px;height:138px;overflow:hidden;position:relative;
-  box-shadow:inset 0 0 0 1px #7e8a6c, inset 0 2px 10px rgba(0,0,0,.18);
-  background-image:linear-gradient(#a9b596,#aeba9b);
+#cover .brand{text-align:center;flex:none;padding:2px 0 6px;}
+#cover .brand .model{font-family:'Archivo',sans-serif;font-weight:500;letter-spacing:.5px;font-size:clamp(15px,5vw,22px);color:#3a3f45;}
+#cover .brand .model b{color:var(--brand-blue);font-weight:700;}
+#cover .brand .mv{font-family:'Archivo',sans-serif;font-style:italic;font-weight:500;color:var(--brand-blue);font-size:clamp(11px,3.6vw,15px);letter-spacing:.5px;margin-top:-2px;}
+#cover .brand .ti{display:inline-flex;align-items:center;gap:5px;margin-top:3px;color:#444;font-family:'Archivo',sans-serif;font-weight:700;font-size:clamp(8px,2.6vw,11px);letter-spacing:1px;}
+#cover .brand .ti .logo{width:14px;height:14px;background:var(--red);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;}
+#cover .lcd{
+  flex:none;height:clamp(110px,21vh,150px);
+  background:linear-gradient(160deg,var(--lcd) 0%,var(--lcd-2) 100%);
+  border:2px solid #5d6258;border-radius:6px;margin:2px 0 10px;padding:4px 8px 6px;
+  color:var(--lcd-ink);position:relative;display:flex;flex-direction:column;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.28);overflow:hidden;
 }
-.ti-screen::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:repeating-linear-gradient(0deg,rgba(40,55,30,.05) 0 1px,transparent 1px 3px);}
-.ti-lcd{
-  font-family:"VT323",monospace;color:#1c2614;font-size:21px;line-height:1.12;
-  padding:6px 8px;height:100%;overflow-y:auto;white-space:pre-wrap;word-break:break-all;
-  text-shadow:0 0 1px rgba(28,38,20,.4);position:relative;z-index:1;
-}
-.ti-lcd .ans{text-align:right;}
-.ti-cursor{display:inline-block;width:9px;height:17px;background:#1c2614;vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+#cover .lcd.off{filter:brightness(.78) saturate(.5);}
+#cover .lcd .status{display:flex;justify-content:space-between;font-family:'VT323',monospace;font-size:clamp(13px,3.6vw,17px);line-height:1;letter-spacing:1px;height:16px;flex:none;}
+#cover .lcd .status .left{color:#1b1f16;}
+#cover .lcd .status .right{display:flex;gap:8px;align-items:center;}
+#cover .lcd .screen{flex:1;display:flex;flex-direction:column;justify-content:flex-end;overflow-y:auto;overflow-x:hidden;font-family:'VT323',monospace;}
+#cover .lcd .screen::-webkit-scrollbar{width:0;height:0;}
+#cover .hline{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;font-size:clamp(20px,6.2vw,28px);line-height:1.15;min-height:1.15em;}
+#cover .hexpr{white-space:nowrap;overflow:hidden;text-overflow:clip;direction:rtl;text-align:left;flex:1;}
+#cover .hexpr>span{direction:ltr;unicode-bidi:plaintext;}
+#cover .hres{white-space:nowrap;flex:none;display:flex;align-items:center;}
+#cover .hline.active .hexpr{color:#1b1f16;}
+#cover .cursor{display:inline-block;width:9px;margin-left:0px;border-bottom:3px solid #1b1f16;animation:blink 1s steps(1) infinite;transform:translateY(-2px);}
 @keyframes blink{50%{opacity:0;}}
-.ti-flash{animation:tishake .18s;}
-@keyframes tishake{25%{transform:translateX(-3px);}75%{transform:translateX(3px);}}
-
-/* indicators (2nd / alpha) */
-.ti-ind{display:flex;gap:7px;padding:0 6px 8px;min-height:14px;}
-.ti-ind span{font-family:"Outfit";font-size:9.5px;font-weight:700;letter-spacing:.5px;padding:1px 6px;border-radius:5px;opacity:0;transition:opacity .12s;}
-.ti-ind .i2nd{color:#fff;background:#2f6fb0;}
-.ti-ind .ialpha{color:#10331b;background:#52b878;}
-.ti-ind span.on{opacity:1;}
-
-/* keypad */
-.ti-pad{
-  flex:1;min-height:0;display:grid;grid-template-columns:repeat(5,1fr);
-  gap:7px 6px;align-content:stretch;padding-top:11px;
+#cover .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:.95;font-size:.82em;margin:0 1px;}
+#cover .frac .num{padding:0 3px 1px;}
+#cover .frac .den{padding:1px 3px 0;border-top:2px solid currentColor;}
+#cover .rad{border-top:2px solid currentColor;padding:0 2px;margin-left:-1px;}
+#cover .pad{flex:1;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);gap:5px 6px;min-height:0;}
+#cover .cell{display:flex;flex-direction:column;justify-content:flex-end;min-height:0;min-width:0;}
+#cover .sec{font-family:'Archivo Narrow',sans-serif;font-weight:600;color:var(--teal);font-size:clamp(7px,2.1vw,10px);line-height:1;text-align:center;height:11px;white-space:nowrap;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+#cover .key{
+  flex:1;border:none;border-radius:11px;cursor:pointer;
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:clamp(12px,3.8vw,17px);
+  display:flex;align-items:center;justify-content:center;line-height:1;
+  padding:0;min-width:0;min-height:24px;transition:transform .04s, filter .04s;
+  background:linear-gradient(180deg,var(--keyw) 0%,#eef0f1 100%);color:var(--keyw-ink);
+  box-shadow:0 2px 0 var(--keyw-edge),0 3px 4px rgba(0,0,0,.18),inset 0 1px 0 #fff;
 }
-.tk{
-  position:relative;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:linear-gradient(180deg,#595d66,#3c3f47);color:#f3f4f7;
-  font-family:"Outfit";font-weight:600;font-size:clamp(11px,3.4vw,15px);
-  border:1px solid #24262b;box-shadow:0 2px 0 #1f2126,0 3px 5px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12);
-  min-height:30px;padding:2px;text-align:center;line-height:1.05;user-select:none;
-  transition:transform .04s,box-shadow .04s,filter .1s;
-}
-.tk:active{transform:translateY(2px);box-shadow:0 0 0 #1f2126,inset 0 2px 4px rgba(0,0,0,.5);filter:brightness(1.08);}
-.tk .lbl2{position:absolute;top:-12px;font-size:8px;font-weight:700;color:#7fbef0;letter-spacing:.2px;white-space:nowrap;}
-.tk .lblA{position:absolute;top:-12px;right:3px;font-size:8px;font-weight:700;color:#73d493;}
-.tk.num{background:linear-gradient(180deg,#6a6f79,#4b4f58);font-size:clamp(14px,4.4vw,19px);font-weight:700;}
-.tk.op{background:linear-gradient(180deg,#4c5563,#363d49);color:#dfe6f0;font-size:clamp(15px,4.6vw,20px);}
-.tk.graph{background:linear-gradient(180deg,#3f4350,#2b2e38);font-size:clamp(9px,2.9vw,12px);color:#cdd6e6;}
-.tk.k2nd{background:linear-gradient(180deg,#3f86cf,#255f9f);color:#fff;}
-.tk.kalpha{background:linear-gradient(180deg,#5cc07f,#3a9a5b);color:#08240f;}
-.tk.enter{background:linear-gradient(180deg,#3f86cf,#235c9b);color:#fff;font-weight:700;font-size:clamp(11px,3.4vw,15px);}
-.tk.on-k{background:linear-gradient(180deg,#54585f,#383b42);}
-.tk.wide{grid-column:span 1;}
-
-/* directional pad (decoratief) */
-.ti-dpad{grid-column:4 / 6;grid-row:2 / 4;position:relative;display:grid;place-items:center;}
-.ti-dpad .ring{
-  width:clamp(72px,30vw,104px);aspect-ratio:1/1;border-radius:50%;
-  background:radial-gradient(circle at 50% 40%,#5a5e67,#34373e);
-  border:1px solid #23252b;box-shadow:0 2px 0 #1f2126,0 3px 6px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12);
-  position:relative;
-}
-.ti-dpad .ring::before{content:"";position:absolute;inset:34%;border-radius:50%;background:linear-gradient(180deg,#3c3f47,#2a2c32);box-shadow:inset 0 1px 3px rgba(0,0,0,.5);}
-.ti-dpad .ar{position:absolute;color:#cfd2d8;font-size:13px;line-height:1;}
-.ti-dpad .ar.u{top:6px;left:50%;transform:translateX(-50%);}
-.ti-dpad .ar.d{bottom:6px;left:50%;transform:translateX(-50%);}
-.ti-dpad .ar.l{left:7px;top:50%;transform:translateY(-50%);}
-.ti-dpad .ar.r{right:7px;top:50%;transform:translateY(-50%);}
-.ti-dpad:active .ring{transform:translateY(1px);}
+#cover .key:active{transform:translateY(2px);box-shadow:0 0 0 var(--keyw-edge),0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 #fff;filter:brightness(.97);}
+#cover .key.dark{background:linear-gradient(180deg,var(--keyd-top) 0%,var(--keyd-bot) 100%);color:var(--keyd-ink);box-shadow:0 2px 0 #2e3338,0 3px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.18);}
+#cover .key.dark:active{box-shadow:0 0 0 #2e3338,0 1px 2px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.15);}
+#cover .key.blue{background:linear-gradient(180deg,#3a98d2 0%,var(--blue) 100%);color:#fff;box-shadow:0 2px 0 #1f6ea2,0 3px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.3);}
+#cover .key.blue.on2{box-shadow:0 0 0 2px #ffd54a,0 2px 0 #1f6ea2,0 0 10px rgba(255,213,74,.7);}
+#cover .key sup{font-size:.62em;}
+#cover .key sub{font-size:.6em;}
+#cover .key .inv{font-size:.66em;vertical-align:super;}
+#cover .varkey{display:inline-flex;align-items:flex-end;}
+#cover .varkey b{font-style:italic;font-size:1.15em;}
+#cover .varkey .vs{display:flex;flex-direction:column;font-size:.5em;margin-left:1px;line-height:.95;color:var(--teal);}
+#cover .key.dark .varkey .vs{color:#bfe2f5;}
+#cover .kfrac{display:inline-flex;flex-direction:column;align-items:center;font-size:.78em;line-height:.85;}
+#cover .kfrac .b{border-top:1.5px solid currentColor;}
+#cover .dpadcell{align-items:center;justify-content:center;}
+#cover .dpad{position:relative;width:clamp(72px,21vw,92px);height:clamp(72px,21vw,92px);border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, #6a6f76 0%, #4c5158 70%, #3c4046 100%);
+  box-shadow:0 3px 6px rgba(0,0,0,.4),inset 0 1px 2px rgba(255,255,255,.2);}
+#cover .dbtn{position:absolute;background:transparent;border:none;color:#e8eaec;font-size:14px;cursor:pointer;width:34%;height:34%;display:flex;align-items:center;justify-content:center;}
+#cover .dbtn:active{color:#fff;filter:brightness(1.4);}
+#cover .dbtn.up{top:2%;left:33%;}
+#cover .dbtn.down{bottom:2%;left:33%;}
+#cover .dbtn.left{left:2%;top:33%;}
+#cover .dbtn.right{right:2%;top:33%;}
+#cover .dcenter{position:absolute;left:34%;top:34%;width:32%;height:32%;border-radius:50%;background:radial-gradient(circle at 40% 35%,#23262a,#0c0d0f);box-shadow:inset 0 1px 2px rgba(255,255,255,.15);}
+#cover .menu{position:absolute;inset:0;background:rgba(20,22,25,.55);display:none;align-items:center;justify-content:center;z-index:30;border-radius:6px;}
+#cover .menu.show{display:flex;}
+#cover .menubox{background:#f3f4f5;border-radius:12px;padding:14px;min-width:200px;box-shadow:0 8px 30px rgba(0,0,0,.5);font-family:'Archivo',sans-serif;}
+#cover .menubox h4{margin:0 0 8px;font-size:14px;color:#33373d;font-weight:700;}
+#cover .menubox .opt{display:block;width:100%;text-align:left;border:1px solid #d4d8db;background:#fff;border-radius:8px;padding:9px 12px;margin:5px 0;font-size:14px;color:#33373d;cursor:pointer;font-weight:500;}
+#cover .menubox .opt.sel{background:var(--blue);color:#fff;border-color:var(--blue);}
+#cover .menubox .opt:active{filter:brightness(.95);}
+#cover .calc-toast{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(20,22,25,.92);color:#fff;font-family:'Archivo',sans-serif;font-size:12px;padding:9px 14px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:40;max-width:80%;text-align:center;}
+#cover .calc-toast.show{opacity:1;}
+@media (max-height:680px){#cover .lcd{height:96px;} #cover .brand{padding:0 0 3px;}}
 
 /* ============================== VAULT ============================== */
 #vault{
@@ -381,88 +395,24 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 <!-- ============================== COVER ============================== -->
 <div id="cover" class="app active">
-  <div class="ti">
-    <div class="ti-head">
-      <div class="ti-wordmark">TI-84 Plus<small>Texas Instruments</small></div>
-      <div class="ti-led"></div>
-    </div>
-
-    <div class="ti-screen-wrap">
-      <div class="ti-screen">
-        <div class="ti-lcd" id="tiLcd"></div>
+  <div class="device">
+    <div class="face">
+      <div class="brand">
+        <div class="model">TI-<b>30XB</b></div>
+        <div class="mv">MultiView</div>
+        <div class="ti"><span class="logo">TI</span>TEXAS INSTRUMENTS</div>
       </div>
-    </div>
-    <div class="ti-ind">
-      <span class="i2nd" id="ind2nd">2ND</span>
-      <span class="ialpha" id="indAlpha">A</span>
-    </div>
-
-    <div class="ti-pad" id="tiPad">
-      <!-- graph-rij -->
-      <button class="tk graph" data-k="noop"><span class="lbl2">STAT PLOT</span>Y=</button>
-      <button class="tk graph" data-k="noop"><span class="lbl2">TBLSET</span>WINDOW</button>
-      <button class="tk graph" data-k="noop"><span class="lbl2">FORMAT</span>ZOOM</button>
-      <button class="tk graph" data-k="noop"><span class="lbl2">CALC</span>TRACE</button>
-      <button class="tk graph" data-k="noop"><span class="lbl2">TABLE</span>GRAPH</button>
-
-      <!-- 2nd / mode / del  + dpad -->
-      <button class="tk k2nd" data-k="2nd">2ND</button>
-      <button class="tk" data-k="noop"><span class="lbl2">QUIT</span>MODE</button>
-      <button class="tk" data-k="del"><span class="lbl2">INS</span>DEL</button>
-      <div class="ti-dpad" data-k="noop">
-        <div class="ring">
-          <span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◄</span><span class="ar r">►</span>
+      <div class="lcd" id="lcd">
+        <div class="status">
+          <span class="left" id="st-2nd"></span>
+          <span class="right"><span id="st-mode">RAD</span><span id="st-scroll"></span></span>
         </div>
+        <div class="screen" id="screen"></div>
+        <div class="menu" id="menu"><div class="menubox" id="menubox"></div></div>
       </div>
-
-      <button class="tk kalpha" data-k="alpha"><span class="lbl2">A-LOCK</span>ALPHA</button>
-      <button class="tk" data-k="x"><span class="lbl2">LINK</span>X,T,&#952;,n</button>
-      <button class="tk" data-k="noop"><span class="lbl2">LIST</span>STAT</button>
-
-      <!-- math rij -->
-      <button class="tk" data-k="noop"><span class="lbl2">TEST</span><span class="lblA">A</span>MATH</button>
-      <button class="tk" data-k="noop"><span class="lbl2">ANGLE</span><span class="lblA">B</span>APPS</button>
-      <button class="tk" data-k="noop"><span class="lbl2">DRAW</span><span class="lblA">C</span>PRGM</button>
-      <button class="tk" data-k="noop"><span class="lbl2">DISTR</span>VARS</button>
-      <button class="tk" data-k="clear">CLEAR</button>
-
-      <!-- functies -->
-      <button class="tk" data-k="inv"><span class="lbl2">MATRX</span><span class="lblA">D</span>x&#8315;&#185;</button>
-      <button class="tk" data-k="sin("><span class="lbl2">SIN&#8315;&#185;</span><span class="lblA">E</span>SIN</button>
-      <button class="tk" data-k="cos("><span class="lbl2">COS&#8315;&#185;</span><span class="lblA">F</span>COS</button>
-      <button class="tk" data-k="tan("><span class="lbl2">TAN&#8315;&#185;</span><span class="lblA">G</span>TAN</button>
-      <button class="tk op" data-k="^"><span class="lblA">H</span>^</button>
-
-      <button class="tk" data-k="sq"><span class="lbl2">&#8730;</span><span class="lblA">I</span>x&#178;</button>
-      <button class="tk" data-k=","><span class="lbl2">EE</span><span class="lblA">J</span>,</button>
-      <button class="tk" data-k="("><span class="lbl2">{</span><span class="lblA">K</span>(</button>
-      <button class="tk" data-k=")"><span class="lbl2">}</span><span class="lblA">L</span>)</button>
-      <button class="tk op" data-k="&#247;"><span class="lblA">M</span>&#247;</button>
-
-      <button class="tk" data-k="log("><span class="lbl2">10&#8319;</span><span class="lblA">N</span>LOG</button>
-      <button class="tk num" data-k="7"><span class="lblA">O</span>7</button>
-      <button class="tk num" data-k="8"><span class="lblA">P</span>8</button>
-      <button class="tk num" data-k="9"><span class="lblA">Q</span>9</button>
-      <button class="tk op" data-k="&#215;"><span class="lblA">R</span>&#215;</button>
-
-      <button class="tk" data-k="ln("><span class="lbl2">e&#8319;</span><span class="lblA">S</span>LN</button>
-      <button class="tk num" data-k="4"><span class="lblA">T</span>4</button>
-      <button class="tk num" data-k="5"><span class="lblA">U</span>5</button>
-      <button class="tk num" data-k="6"><span class="lblA">V</span>6</button>
-      <button class="tk op" data-k="&#8722;"><span class="lblA">W</span>&#8722;</button>
-
-      <button class="tk" data-k="noop"><span class="lbl2">RCL</span>STO&#9658;</button>
-      <button class="tk num" data-k="1"><span class="lblA">X</span>1</button>
-      <button class="tk num" data-k="2"><span class="lblA">Y</span>2</button>
-      <button class="tk num" data-k="3"><span class="lblA">Z</span>3</button>
-      <button class="tk op" data-k="+"><span class="lblA">&#34;</span>+</button>
-
-      <button class="tk on-k" data-k="off">ON</button>
-      <button class="tk num" data-k="0"><span class="lblA">_</span>0</button>
-      <button class="tk num" data-k="."><span class="lblA">:</span>.</button>
-      <button class="tk" data-k="neg"><span class="lbl2">ANS</span>(&#8722;)</button>
-      <button class="tk enter" data-k="enter"><span class="lbl2">ENTRY</span>ENTER</button>
+      <div class="pad" id="pad"></div>
     </div>
+    <div class="calc-toast" id="calcToast"></div>
   </div>
 </div>
 
@@ -675,129 +625,625 @@ async function refreshData(){
 }
 
 /* =================================================================
-   COVER: TI-84 PLUS home-screen simulatie
+   COVER: TI-30XB MultiView — functionele rekenmachine
+   (met verborgen ontgrendeling: typ je geheime cijfercode + enter)
    ================================================================= */
-let tiTokens=[], tiHist=[], ti2nd=false, tiAlpha=false;
-const tiLcd=$('#tiLcd');
+const Calc = (function(){
+"use strict";
 
-function escTi(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-function renderTi(){
-  let h='';
-  for(const ln of tiHist){
-    h+= ln.t==='ans' ? `<div class="ans">${escTi(ln.x)}</div>` : `<div>${escTi(ln.x)}</div>`;
-  }
-  h+=`<div>${escTi(tiTokens.join(''))}<span class="ti-cursor"></span></div>`;
-  tiLcd.innerHTML=h;
-  tiLcd.scrollTop=tiLcd.scrollHeight;
-}
-function tiFlash(){
-  const sc=tiLcd.parentElement;sc.classList.remove('ti-flash');void sc.offsetWidth;sc.classList.add('ti-flash');
-}
-function fmtAns(n){
-  if(!isFinite(n))return 'ERROR';
-  if(Number.isInteger(n)&&Math.abs(n)<1e10)return String(n);
-  const a=Math.abs(n);
-  if(a!==0&&(a>=1e10||a<1e-4)){
-    let e=n.toExponential(6).replace(/(\.\d*?)0+e/,'$1e').replace(/\.e/,'e');
-    return e.replace('e','E').replace('E+','E');
-  }
-  return String(parseFloat(n.toPrecision(10)));
-}
-function tokensToJS(tokens){
-  let s=tokens.join('');
-  const map=[
-    ['√(','Math.sqrt('],['asin(','Math.asin('],['acos(','Math.acos('],['atan(','Math.atan('],
-    ['sin(','Math.sin('],['cos(','Math.cos('],['tan(','Math.tan('],
-    ['10^(','10**('],['e^(','Math.E**('],['log(','Math.log10('],['ln(','Math.log('],
-    ['²','**2'],['⁻¹','**-1'],['π','Math.PI'],
-    ['×','*'],['÷','/'],['−','-'],['^','**']
-  ];
-  for(const [a,b] of map){s=s.split(a).join(b);}
-  // open haakjes automatisch sluiten
-  const open=(s.match(/\(/g)||[]).length, close=(s.match(/\)/g)||[]).length;
-  s+=')'.repeat(Math.max(0,open-close));
-  return s;
-}
-function tiEval(){
-  const js=tokensToJS(tiTokens);
-  // eslint-disable-next-line no-new-func
-  const r=Function('"use strict";return ('+js+')')();
-  if(typeof r!=='number'||isNaN(r))throw new Error('bad');
-  return r;
-}
-
-const TI_APPEND={
-  '0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
-  '.':'.','(':'(',')':')',',':',','^':'^','+':'+','−':'−','×':'×','÷':'÷'
+const state = {
+  tokens: [],          // {code, disp, isVar?}
+  cursor: 0,
+  history: [],         // {exprDisp, struct, dec, showDec}
+  mode: 'RAD',         // DEG | RAD | GRAD
+  second: false,
+  ans: 0,
+  vars: {x:0,y:0,z:0,t:0,a:0,b:0,c:0},
+  varCycle: ['x','y','z','t','a','b','c'],
+  pendingStore: false,
+  power: true,
+  scrollTop: false,
 };
 
-async function tiKey(k){
-  navigator.vibrate&&navigator.vibrate(6);
+/* =================== KEYPAD CONFIG =================== */
+const VAR_LABEL = '<span class="varkey"><b>x</b><span class="vs"><span>yzt</span><span>abc</span></span></span>';
+const ND_LABEL  = '<span class="kfrac"><span>n</span><span class="b">d</span></span>';
 
-  if(k==='2nd'){ti2nd=!ti2nd;$('#ind2nd').classList.toggle('on',ti2nd);return;}
-  if(k==='alpha'){tiAlpha=!tiAlpha;$('#indAlpha').classList.toggle('on',tiAlpha);return;}
-  if(k==='noop'){return;}
+const KEYS = [
+  // r1
+  {id:'2nd', r:1,c:1, label:'2nd', cls:'blue', sec:''},
+  {id:'mode',r:1,c:2, label:'mode', sec:'quit'},
+  {id:'del', r:1,c:3, label:'delete', sec:'insert'},
+  // r2
+  {id:'log', r:2,c:1, label:'log', sec:'10<sup>x</sup>'},
+  {id:'prb', r:2,c:2, label:'prb', sec:'angle'},
+  {id:'data',r:2,c:3, label:'data', sec:'stat'},
+  // r3
+  {id:'ln',  r:3,c:1, label:'ln', sec:'e<sup>x</sup>'},
+  {id:'nd',  r:3,c:2, label:ND_LABEL, sec:'U <span style="font-size:.85em">n/d</span>'},
+  {id:'e10', r:3,c:3, label:'×10<sup>n</sup>', sec:'◀▶U n/d'},
+  {id:'table',r:3,c:4, label:'table', sec:'f◀▶d'},
+  {id:'clear',r:3,c:5, label:'clear', sec:'K'},
+  // r4
+  {id:'pi',  r:4,c:1, label:'π', sec:'hyp'},
+  {id:'sin', r:4,c:2, label:'sin', sec:'sin<sup>-1</sup>'},
+  {id:'cos', r:4,c:3, label:'cos', sec:'cos<sup>-1</sup>'},
+  {id:'tan', r:4,c:4, label:'tan', sec:'tan<sup>-1</sup>'},
+  {id:'div', r:4,c:5, label:'÷', cls:'dark', sec:'K'},
+  // r5
+  {id:'pow', r:5,c:1, label:'^', sec:'<sup>x</sup>√'},
+  {id:'inv', r:5,c:2, label:'x<span class="inv">-1</span>', sec:''},
+  {id:'lpar',r:5,c:3, label:'(', sec:'%'},
+  {id:'rpar',r:5,c:4, label:')', sec:'▶%'},
+  {id:'mul', r:5,c:5, label:'×', cls:'dark', sec:'◑'},
+  // r6
+  {id:'sq',  r:6,c:1, label:'x<sup>2</sup>', sec:'√'},
+  {id:'d7',  r:6,c:2, label:'7'},
+  {id:'d8',  r:6,c:3, label:'8'},
+  {id:'d9',  r:6,c:4, label:'9'},
+  {id:'sub', r:6,c:5, label:'−', cls:'dark', sec:'◐'},
+  // r7
+  {id:'var', r:7,c:1, label:VAR_LABEL, sec:'clear var'},
+  {id:'d4',  r:7,c:2, label:'4'},
+  {id:'d5',  r:7,c:3, label:'5'},
+  {id:'d6',  r:7,c:4, label:'6'},
+  {id:'add', r:7,c:5, label:'+', cls:'dark', sec:'◐'},
+  // r8
+  {id:'sto', r:8,c:1, label:'sto▸', sec:'recall'},
+  {id:'d1',  r:8,c:2, label:'1'},
+  {id:'d2',  r:8,c:3, label:'2'},
+  {id:'d3',  r:8,c:4, label:'3'},
+  {id:'toggle',r:8,c:5, label:'◀▶', cls:'dark', sec:''},
+  // r9
+  {id:'on',  r:9,c:1, label:'on', sec:'off'},
+  {id:'d0',  r:9,c:2, label:'0', sec:'reset'},
+  {id:'dot', r:9,c:3, label:'.', sec:','},
+  {id:'neg', r:9,c:4, label:'(−)', sec:'ans'},
+  {id:'enter',r:9,c:5, label:'enter', sec:''},
+];
 
-  const use2nd=ti2nd;            // verbruik 2nd na deze toets
-  const clear2nd=()=>{if(ti2nd){ti2nd=false;$('#ind2nd').classList.remove('on');}
-                      if(tiAlpha){tiAlpha=false;$('#indAlpha').classList.remove('on');}};
+/* =================== BUILD KEYPAD =================== */
+const pad = document.getElementById('pad');
+KEYS.forEach(k=>{
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.style.gridRow = k.r;
+  cell.style.gridColumn = k.c;
+  const sec = document.createElement('div');
+  sec.className = 'sec';
+  sec.innerHTML = k.sec || '&nbsp;';
+  const btn = document.createElement('button');
+  btn.className = 'key ' + (k.cls||'');
+  if(k.id==='2nd') btn.id='key-2nd';
+  btn.innerHTML = k.label;
+  btn.addEventListener('click', ()=>handleKey(k.id));
+  cell.appendChild(sec);
+  cell.appendChild(btn);
+  pad.appendChild(cell);
+});
+// D-pad over rows1-2, cols4-5
+const dcell = document.createElement('div');
+dcell.className = 'cell dpadcell';
+dcell.style.gridRow = '1 / 3';
+dcell.style.gridColumn = '4 / 6';
+dcell.innerHTML = '<div class="dpad">'+
+  '<button class="dbtn up" data-d="up">▲</button>'+
+  '<button class="dbtn down" data-d="down">▼</button>'+
+  '<button class="dbtn left" data-d="left">◀</button>'+
+  '<button class="dbtn right" data-d="right">▶</button>'+
+  '<div class="dcenter"></div></div>';
+pad.appendChild(dcell);
+dcell.querySelectorAll('.dbtn').forEach(b=>b.addEventListener('click',()=>handleKey(b.dataset.d)));
 
-  if(k==='off'){tiTokens=[];tiHist=[];clear2nd();renderTi();return;}
-
-  if(k==='del'){clear2nd();if(tiTokens.length)tiTokens.pop();renderTi();return;}
-
-  if(k==='clear'){
-    clear2nd();
-    if(tiTokens.length)tiTokens=[]; else tiHist=[];
-    renderTi();return;
-  }
-
-  if(k==='enter'){
-    clear2nd();
-    // geheime ontgrendeling: alleen pure cijfers
-    if(tiTokens.length && tiTokens.every(t=>/^[0-9]$/.test(t))){
-      const code=tiTokens.join('');
-      const h=await sha(code);
-      if(h===prefs.pinHash){tiTokens=[];tiHist=[];renderTi();openVault();return;}
-    }
-    if(!tiTokens.length){renderTi();return;}
-    const expr=tiTokens.join('');
-    try{
-      const r=tiEval();
-      tiHist.push({t:'expr',x:expr});
-      tiHist.push({t:'ans',x:fmtAns(r)});
-      if(tiHist.length>40)tiHist=tiHist.slice(-40);
-      tiTokens=[];renderTi();
-    }catch(e){
-      tiHist.push({t:'expr',x:expr});
-      tiHist.push({t:'ans',x:'ERR: SYNTAX'});
-      tiTokens=[];renderTi();tiFlash();
-    }
-    return;
-  }
-
-  // functies (met 2nd-varianten)
-  let tok=null;
-  switch(k){
-    case 'sin(': tok=use2nd?'asin(':'sin('; break;
-    case 'cos(': tok=use2nd?'acos(':'cos('; break;
-    case 'tan(': tok=use2nd?'atan(':'tan('; break;
-    case 'log(': tok=use2nd?'10^(':'log('; break;
-    case 'ln(':  tok=use2nd?'e^(':'ln(';  break;
-    case 'sq':   tok=use2nd?'√(':'²';     break;   // 2nd = wortel
-    case 'inv':  tok='⁻¹'; break;
-    case 'neg':  tok='−'; break;                    // negatief / aftrekken
-    default: tok=TI_APPEND[k]; 
-  }
-  clear2nd();
-  if(tok!=null){tiTokens.push(tok);renderTi();}
+/* =================== TOAST (binnen het toestel) =================== */
+let toastT;
+function toast(msg){
+  const el=document.getElementById('calcToast');
+  if(!el)return;
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>el.classList.remove('show'),1600);
 }
 
-$('#tiPad').addEventListener('click',e=>{
-  const b=e.target.closest('[data-k]');
-  if(b)tiKey(b.dataset.k);
-});
+/* =================== INSERT / EDIT =================== */
+function insert(code, disp, extra){
+  const tok = Object.assign({code, disp:disp!==undefined?disp:code}, extra||{});
+  state.tokens.splice(state.cursor,0,tok);
+  state.cursor++;
+}
+function backspace(){
+  if(state.cursor>0){ state.tokens.splice(state.cursor-1,1); state.cursor--; }
+}
+function clearEntry(){ state.tokens=[]; state.cursor=0; }
+function maybeAns(){ if(state.tokens.length===0){ insert('A','Ans'); } }
+
+/* =================== KEY HANDLER =================== */
+function handleKey(id){
+  if(navigator.vibrate) navigator.vibrate(6);
+
+  // power
+  if(id==='on'){
+    if(!state.power){ state.power=true; document.getElementById('lcd').classList.remove('off'); render(); return; }
+  }
+  if(!state.power){ return; }
+
+  const s = state.second;
+  if(id==='2nd'){ state.second=!state.second; render(); return; }
+
+  // sto-flow: bij een variabele-toets opslaan i.p.v. invoegen
+  if(state.pendingStore && id==='var'){
+    const letter = nextVarLetter(true);
+    state.vars[letter] = state.ans;
+    state.pendingStore=false;
+    toast(letter + ' = ' + fmtDec(state.ans));
+    render(); return;
+  }
+
+  let consume2nd = true;
+
+  switch(id){
+    /* --- directioneel --- */
+    case 'left':  if(state.cursor>0) state.cursor--; break;
+    case 'right': if(state.cursor<state.tokens.length) state.cursor++; break;
+    case 'up':    toggleLastForm(); break;
+    case 'down':  toggleLastForm(); break;
+
+    /* --- bewerken --- */
+    case 'del':   if(s){ toast('Insert/Overschrijf'); } else backspace(); break;
+    case 'clear': if(s){ toast('K (constante) – niet in webversie'); }
+                  else { if(state.tokens.length) clearEntry(); else state.history=[]; } break;
+
+    /* --- modi/menus --- */
+    case 'mode':  if(s){ closeMenu(); } else openModeMenu(); break;
+    case 'prb':   if(s){ toast('angle-menu – niet in webversie'); } else openPrbMenu(); break;
+    case 'data':  toast(s?'stat – niet in webversie':'data/lijsten – niet in webversie'); break;
+    case 'table': if(s){ toggleLastForm(); } else toast('table – niet in webversie'); break;
+
+    /* --- getallen --- */
+    case 'd0': if(s){ resetAll(); } else insert('0'); break;
+    case 'd1': insert('1'); break;
+    case 'd2': insert('2'); break;
+    case 'd3': insert('3'); break;
+    case 'd4': insert('4'); break;
+    case 'd5': insert('5'); break;
+    case 'd6': insert('6'); break;
+    case 'd7': insert('7'); break;
+    case 'd8': insert('8'); break;
+    case 'd9': insert('9'); break;
+    case 'dot': if(s) insert(',',','); else insert('.'); break;
+
+    /* --- operatoren --- */
+    case 'add': maybeAns(); insert('+'); break;
+    case 'sub': maybeAns(); insert('-'); break;
+    case 'mul': if(s){ toast('contrast'); } else { maybeAns(); insert('*','*'); } break;
+    case 'div': if(s){ toast('K (constante) – niet in webversie'); } else { maybeAns(); insert('/','/'); } break;
+    case 'pow': maybeAns(); insert('^'); break;
+    case 'neg': if(s) insert('A','Ans'); else insert('-','-'); break;
+
+    /* --- haakjes & frac --- */
+    case 'lpar': if(s) insert('%','%'); else insert('('); break;
+    case 'rpar': if(s){ toast('▶% – niet in webversie'); } else insert(')'); break;
+    case 'nd':   if(s){ toast('U n/d (gemengd getal) – niet in webversie'); } else insert('/','/'); break;
+
+    /* --- constanten --- */
+    case 'pi':   if(s){ toast('hyp – niet in webversie'); } else insert('π','π'); break;
+
+    /* --- machten / wortels --- */
+    case 'sq':   if(s){ insert('sqrt(','√('); } else insert('²','²'); break;
+    case 'inv':  insert('⁻¹','⁻¹'); break;
+    case 'e10':  if(s){ toast('◀▶U n/d – niet in webversie'); } else insert('*10^','ᴇ'); break;
+
+    /* --- functies --- */
+    case 'log':  if(s) insert('10^(','10^('); else insert('log(','log('); break;
+    case 'ln':   if(s) insert('e^(','e^('); else insert('ln(','ln('); break;
+    case 'sin':  if(s) insert('asin(','sin⁻¹('); else insert('sin(','sin('); break;
+    case 'cos':  if(s) insert('acos(','cos⁻¹('); else insert('cos(','cos('); break;
+    case 'tan':  if(s) insert('atan(','tan⁻¹('); else insert('tan(','tan('); break;
+
+    /* --- variabelen / geheugen --- */
+    case 'var':  if(s){ resetVars(); } else cycleOrInsertVar(); break;
+    case 'sto':  if(s){ insertVarToken(nextVarLetter(false)); }
+                 else { evalEntryToAns(); state.pendingStore=true; toast('STO▸ kies een variabele'); } break;
+
+    /* --- vorm wisselen --- */
+    case 'toggle': toggleLastForm(); break;
+
+    /* --- uit --- */
+    case 'on':   if(s){ state.power=false; document.getElementById('lcd').classList.add('off'); } break;
+
+    /* --- bereken / ontgrendel --- */
+    case 'enter': handleEnter(); return;
+
+    default: consume2nd=true;
+  }
+
+  if(consume2nd && id!=='2nd') state.second=false;
+  render();
+}
+
+/* =================== ENTER + VERBORGEN ONTGRENDELING =================== */
+function handleEnter(){
+  state.second=false;
+  // Geheime ontgrendeling: alléén een reeks pure cijfers + enter
+  if(state.tokens.length && state.tokens.every(t=>/^[0-9]$/.test(t.code))){
+    const code=state.tokens.map(t=>t.code).join('');
+    sha(code).then(h=>{
+      if(h===prefs.pinHash){ reset(); openVault(); }
+      else { doEnter(); render(); }
+    }).catch(()=>{ doEnter(); render(); });
+    return;
+  }
+  doEnter();
+  render();
+}
+
+/* =================== VARIABELEN =================== */
+let lastVarIdx = 0;
+function cycleOrInsertVar(){
+  const prev = state.tokens[state.cursor-1];
+  if(prev && prev.isVar){
+    lastVarIdx = (state.varCycle.indexOf(prev.code)+1) % state.varCycle.length;
+    const letter = state.varCycle[lastVarIdx];
+    prev.code = letter; prev.disp = letter;
+  } else {
+    lastVarIdx = 0;
+    insertVarToken('x');
+  }
+}
+function insertVarToken(letter){ insert(letter, letter, {isVar:true}); }
+function nextVarLetter(advance){
+  const l = state.varCycle[lastVarIdx];
+  if(advance) lastVarIdx = (lastVarIdx+1)%state.varCycle.length;
+  return l;
+}
+function resetVars(){ state.varCycle.forEach(v=>state.vars[v]=0); toast('Variabelen gewist'); }
+function resetAll(){ state.tokens=[]; state.cursor=0; state.history=[]; state.ans=0; resetVars(); state.mode='RAD'; toast('Reset'); }
+
+function evalEntryToAns(){
+  if(state.tokens.length){
+    try{ const v=evaluate(buildCode()); if(isFinite(v)) state.ans=v; }catch(e){}
+  }
+}
+
+/* =================== BEREKENEN =================== */
+function doEnter(){
+  if(state.tokens.length===0) return;
+  const exprDisp = state.tokens.map(t=>t.disp).join('');
+  let val, ok=true;
+  try{ val = evaluate(buildCode()); }catch(e){ ok=false; }
+  if(!ok || !isFinite(val) || isNaN(val)){
+    state.history.push({exprDisp, struct:{type:'err'}, dec:'Error', showDec:true});
+  } else {
+    state.ans = val;
+    const struct = prettify(val);
+    state.history.push({exprDisp, struct, dec:fmtDec(val), showDec:false});
+  }
+  if(state.history.length>40) state.history.shift();
+  clearEntry();
+}
+
+function buildCode(){
+  let s = state.tokens.map(t=>t.code).join('');
+  let open=0;
+  for(const ch of s){ if(ch==='(') open++; else if(ch===')') open--; }
+  while(open-->0) s+=')';
+  return s;
+}
+
+function toggleLastForm(){
+  if(state.history.length===0) return;
+  const h = state.history[state.history.length-1];
+  if(h.struct.type==='err') return;
+  if(h.struct.type==='int' || h.struct.type==='dec'){ toast('Geen exacte vorm beschikbaar'); return; }
+  h.showDec = !h.showDec;
+}
+
+/* =================== EXACTE-WAARDE HEURISTIEK =================== */
+function contFrac(x, maxDen){
+  x = Math.abs(x);
+  let a0=Math.floor(x), p0=1,q0=0,p1=a0,q1=1, frac=x-a0;
+  let guard=0;
+  while(frac>1e-15 && q1<=maxDen && guard++<60){
+    const r=1/frac, a=Math.floor(r);
+    const p2=a*p1+p0, q2=a*q1+q0;
+    if(q2>maxDen) break;
+    p0=p1;q0=q1;p1=p2;q1=q2;frac=r-a;
+  }
+  return {p:p1,q:q1,err:Math.abs(x-p1/q1)};
+}
+function prettify(x){
+  if(!isFinite(x)) return {type:'err'};
+  const ax=Math.abs(x), sgn=x<0?-1:1;
+  if(Math.abs(x-Math.round(x)) < 1e-9*Math.max(1,ax) && ax<1e12){
+    return {type:'int', value:Math.round(x)};
+  }
+  {
+    const r=x/Math.PI, cf=contFrac(r,36);
+    if(cf.q>=1 && cf.q<=36 && cf.p<=200 && Math.abs(x - sgn*cf.p/cf.q*Math.PI*Math.sign(r||1)) < 1e-9*Math.max(1,ax)){
+      const sign = r<0?-1:1;
+      const cf2 = contFrac(Math.abs(r),36);
+      if(Math.abs(Math.abs(r) - cf2.p/cf2.q) < 1e-10 && cf2.p<=200 && cf2.q<=36){
+        return {type:'pifrac', sign, p:cf2.p, q:cf2.q};
+      }
+    }
+  }
+  {
+    const cf=contFrac(ax,10000);
+    if(cf.q>1 && cf.q<=10000 && cf.err < 1e-10){
+      return {type:'frac', sign:sgn, p:cf.p, q:cf.q};
+    }
+  }
+  {
+    const ns=[2,3,5,6,7,8,10,11,12,13,14,15,17,18,19,20,21,22,23,24,26,27,28,30];
+    for(const n of ns){
+      const sq=Math.sqrt(n), cf=contFrac(ax/sq,60);
+      if(cf.q>=1 && cf.q<=60 && cf.p<=120 && Math.abs(ax - cf.p/cf.q*sq) < 1e-9*Math.max(1,ax)){
+        return {type:'sqrtfrac', sign:sgn, p:cf.p, q:cf.q, n};
+      }
+    }
+  }
+  return {type:'dec', value:x};
+}
+
+/* =================== DECIMALE FORMATTERING =================== */
+function trimNum(m,d){ return parseFloat(m.toPrecision(d)).toString(); }
+function fmtDec(x){
+  if(!isFinite(x)) return x>0?'∞':(x<0?'-∞':'Error');
+  if(x===0) return '0';
+  const a=Math.abs(x);
+  if(a>=1e10 || a<1e-9){
+    const e=Math.floor(Math.log10(a));
+    const m=x/Math.pow(10,e);
+    return trimNum(m,9)+'ᴇ'+e;
+  }
+  let s=x.toPrecision(11);
+  s=String(parseFloat(s));
+  if(s.replace('-','').replace('.','').length>11 && s.indexOf('.')>=0){
+    s=String(parseFloat(x.toFixed(10)));
+  }
+  return s;
+}
+
+/* =================== RESULTAAT → HTML =================== */
+function fracHTML(num,den){
+  return '<span class="frac"><span class="num">'+num+'</span><span class="den">'+den+'</span></span>';
+}
+function radHTML(n){ return '√<span class="rad">'+n+'</span>'; }
+function resHTML(h){
+  const st=h.struct;
+  if(st.type==='err') return 'Error';
+  if(h.showDec) return h.dec;
+  switch(st.type){
+    case 'int': return String(st.value);
+    case 'dec': return h.dec;
+    case 'frac': return (st.sign<0?'-':'') + fracHTML(st.p, st.q);
+    case 'pifrac': {
+      const num = (st.p===1?'π':st.p+'π');
+      const sign = st.sign<0?'-':'';
+      if(st.q===1) return sign+num;
+      return sign+fracHTML(num, st.q);
+    }
+    case 'sqrtfrac': {
+      const num = (st.p===1?radHTML(st.n):st.p+radHTML(st.n));
+      const sign = st.sign<0?'-':'';
+      if(st.q===1) return sign+num;
+      return sign+fracHTML(num, st.q);
+    }
+  }
+  return h.dec;
+}
+
+/* =================== RENDER =================== */
+function render(){
+  document.getElementById('st-2nd').textContent = state.second ? '2ND' : '';
+  document.getElementById('st-mode').textContent = state.mode;
+  document.getElementById('st-scroll').textContent = state.history.length ? '↑↓' : '';
+  const k2=document.getElementById('key-2nd'); if(k2) k2.classList.toggle('on2', state.second);
+
+  const scr = document.getElementById('screen');
+  scr.innerHTML='';
+  state.history.forEach(h=>{
+    const line=document.createElement('div');
+    line.className='hline';
+    line.innerHTML = '<div class="hexpr"><span>'+escapeExpr(h.exprDisp)+'</span></div><div class="hres">'+resHTML(h)+'</div>';
+    scr.appendChild(line);
+  });
+  const act=document.createElement('div');
+  act.className='hline active';
+  const before = state.tokens.slice(0,state.cursor).map(t=>t.disp).join('');
+  const after  = state.tokens.slice(state.cursor).map(t=>t.disp).join('');
+  act.innerHTML='<div class="hexpr"><span>'+escapeExpr(before)+'<span class="cursor"></span>'+escapeExpr(after)+'</span></div><div class="hres"></div>';
+  scr.appendChild(act);
+  scr.scrollTop = scr.scrollHeight;
+}
+function escapeExpr(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* =================== MENUS =================== */
+function closeMenu(){ const m=document.getElementById('menu'); if(m) m.classList.remove('show'); }
+function openModeMenu(){
+  const box=document.getElementById('menubox');
+  box.innerHTML='<h4>Hoek-modus</h4>';
+  ['DEG','RAD','GRAD'].forEach(m=>{
+    const b=document.createElement('button');
+    b.className='opt'+(state.mode===m?' sel':'');
+    b.textContent=m+(m==='DEG'?'  (graden)':m==='RAD'?'  (radialen)':'  (gon)');
+    b.onclick=()=>{ state.mode=m; closeMenu(); render(); };
+    box.appendChild(b);
+  });
+  const c=document.createElement('button');
+  c.className='opt'; c.textContent='Sluiten'; c.onclick=closeMenu;
+  box.appendChild(c);
+  document.getElementById('menu').classList.add('show');
+}
+function openPrbMenu(){
+  const box=document.getElementById('menubox');
+  box.innerHTML='<h4>PRB</h4>';
+  const opts=[
+    ['nPr  (permutaties)', ()=>{insert('nPr(','nPr(');}],
+    ['nCr  (combinaties)', ()=>{insert('nCr(','nCr(');}],
+    ['!  (faculteit)', ()=>{insert('!','!');}],
+    ['rand  (0–1)', ()=>{insert('rand','rand');}],
+  ];
+  opts.forEach(([t,fn])=>{
+    const b=document.createElement('button'); b.className='opt'; b.textContent=t;
+    b.onclick=()=>{ fn(); closeMenu(); state.second=false; render(); };
+    box.appendChild(b);
+  });
+  const c=document.createElement('button');
+  c.className='opt'; c.textContent='Sluiten'; c.onclick=()=>{closeMenu();render();};
+  box.appendChild(c);
+  document.getElementById('menu').classList.add('show');
+}
+
+/* =================== LEXER =================== */
+const FUNCS1 = ['asin','acos','atan','sqrt','sin','cos','tan','log','ln'];
+const FUNCS2 = ['nPr','nCr','root'];
+function lex(str){
+  const t=[]; let i=0; const n=str.length;
+  const matchName=(arr)=>{ for(const w of arr){ if(str.substr(i,w.length)===w) return w; } return null; };
+  while(i<n){
+    const c=str[i];
+    if(c===' '){ i++; continue; }
+    if((c>='0'&&c<='9')||c==='.'){
+      let j=i; while(j<n && ((str[j]>='0'&&str[j]<='9')||str[j]==='.')) j++;
+      t.push({k:'num', v:parseFloat(str.slice(i,j))}); i=j; continue;
+    }
+    let f=matchName(FUNCS2); if(f){ t.push({k:'f2',v:f}); i+=f.length; continue; }
+    f=matchName(FUNCS1); if(f){ t.push({k:'f1',v:f}); i+=f.length; continue; }
+    if(str.substr(i,4)==='rand'){ t.push({k:'num', v:Math.random()}); i+=4; continue; }
+    if(c==='π'){ t.push({k:'num', v:Math.PI}); i++; continue; }
+    if(c==='e'){ t.push({k:'num', v:Math.E}); i++; continue; }
+    if(c==='A'){ t.push({k:'num', v:state.ans}); i++; continue; }
+    if('xyztabc'.includes(c)){ t.push({k:'num', v:(state.vars[c]||0)}); i++; continue; }
+    if('+-*/^(),'.includes(c)){ t.push({k:'op', v:c}); i++; continue; }
+    if(c==='²'){ t.push({k:'post', v:'sq'}); i++; continue; }
+    if(c==='⁻' && str[i+1]==='¹'){ t.push({k:'post', v:'inv'}); i+=2; continue; }
+    if(c==='!'){ t.push({k:'post', v:'fact'}); i++; continue; }
+    if(c==='%'){ t.push({k:'post', v:'pct'}); i++; continue; }
+    throw new Error('lex:'+c);
+  }
+  return t;
+}
+
+/* =================== PARSER / EVAL =================== */
+function evaluate(codeStr){
+  const toks=lex(codeStr);
+  let pos=0;
+  const peek=()=>toks[pos];
+  const next=()=>toks[pos++];
+  const expect=(v)=>{ const t=toks[pos]; if(t&&t.k==='op'&&t.v===v){pos++;return;} throw new Error('verwacht '+v); };
+
+  const toRad=(x)=> state.mode==='DEG'? x*Math.PI/180 : state.mode==='GRAD'? x*Math.PI/200 : x;
+  const fromRad=(x)=> state.mode==='DEG'? x*180/Math.PI : state.mode==='GRAD'? x*200/Math.PI : x;
+  function fact(n){ if(n<0||Math.abs(n-Math.round(n))>1e-9) return NaN; n=Math.round(n); if(n>170) return Infinity; let r=1; for(let k=2;k<=n;k++) r*=k; return r; }
+
+  function parseExpr(){
+    let v=parseTerm();
+    while(peek() && peek().k==='op' && (peek().v==='+'||peek().v==='-')){
+      const op=next().v; const r=parseTerm();
+      v = op==='+'? v+r : v-r;
+    }
+    return v;
+  }
+  function startsPrimary(t){
+    if(!t) return false;
+    if(t.k==='num'||t.k==='f1'||t.k==='f2') return true;
+    if(t.k==='op'&&t.v==='(') return true;
+    return false;
+  }
+  function parseTerm(){
+    let v=parseUnary();
+    while(true){
+      const t=peek();
+      if(t && t.k==='op' && (t.v==='*'||t.v==='/')){
+        const op=next().v; const r=parseUnary();
+        v = op==='*'? v*r : v/r;
+      } else if(startsPrimary(t)){
+        const r=parseUnary(); v=v*r;
+      } else break;
+    }
+    return v;
+  }
+  function parseUnary(){
+    const t=peek();
+    if(t && t.k==='op' && t.v==='-'){ next(); return -parseUnary(); }
+    if(t && t.k==='op' && t.v==='+'){ next(); return parseUnary(); }
+    return parsePower();
+  }
+  function parsePower(){
+    let base=parsePostfix();
+    if(peek() && peek().k==='op' && peek().v==='^'){
+      next(); const exp=parseUnary(); return Math.pow(base,exp);
+    }
+    return base;
+  }
+  function parsePostfix(){
+    let v=parsePrimary();
+    while(peek() && peek().k==='post'){
+      const p=next().v;
+      if(p==='sq') v=v*v;
+      else if(p==='inv') v=1/v;
+      else if(p==='fact') v=fact(v);
+      else if(p==='pct') v=v/100;
+    }
+    return v;
+  }
+  function applyF1(name,x){
+    switch(name){
+      case 'sin': return Math.sin(toRad(x));
+      case 'cos': return Math.cos(toRad(x));
+      case 'tan': return Math.tan(toRad(x));
+      case 'asin': return fromRad(Math.asin(x));
+      case 'acos': return fromRad(Math.acos(x));
+      case 'atan': return fromRad(Math.atan(x));
+      case 'log': return Math.log10(x);
+      case 'ln': return Math.log(x);
+      case 'sqrt': return Math.sqrt(x);
+    }
+  }
+  function applyF2(name,a,b){
+    if(name==='root') return Math.pow(b,1/a);
+    if(name==='nPr'){ return fact(a)/fact(a-b); }
+    if(name==='nCr'){ return fact(a)/(fact(b)*fact(a-b)); }
+  }
+  function parsePrimary(){
+    const t=next();
+    if(!t) throw new Error('onverwacht einde');
+    if(t.k==='num') return t.v;
+    if(t.k==='op' && t.v==='('){ const v=parseExpr(); expect(')'); return v; }
+    if(t.k==='f1'){ expect('('); const a=parseExpr(); expect(')'); return applyF1(t.v,a); }
+    if(t.k==='f2'){ expect('('); const a=parseExpr(); expect(','); const b=parseExpr(); expect(')'); return applyF2(t.v,a,b); }
+    throw new Error('onverwacht token');
+  }
+
+  const result=parseExpr();
+  if(pos<toks.length) throw new Error('rest');
+  return result;
+}
+
+/* =================== RESET / PUBLIEKE INTERFACE =================== */
+function reset(){
+  state.tokens=[]; state.cursor=0; state.history=[];
+  state.second=false; state.pendingStore=false; state.power=true;
+  const lcd=document.getElementById('lcd'); if(lcd) lcd.classList.remove('off');
+  closeMenu();
+  render();
+}
+
+// voorkom dubbelklik-zoom op iOS
+let lastTouch=0;
+document.addEventListener('touchend',e=>{
+  if(!document.getElementById('cover').classList.contains('active')) return;
+  const now=Date.now();
+  if(now-lastTouch<350) e.preventDefault();
+  lastTouch=now;
+},{passive:false});
+
+render();
+return { reset, render };
+})();
 
 /* =================================================================
    VAULT: navigatie & lock
@@ -813,9 +1259,7 @@ function lockVault(){
   $('#vault').classList.remove('active');
   $('#cover').classList.add('active');
   // reset rekenmachine-scherm
-  tiTokens=[];tiHist=[];ti2nd=false;tiAlpha=false;
-  $('#ind2nd').classList.remove('on');$('#indAlpha').classList.remove('on');
-  renderTi();
+  Calc.reset();
   $('#searchbar').classList.remove('show');$('#searchInput').value='';searchTerm='';
 }
 $('#btnLock').addEventListener('click',lockVault);
@@ -905,17 +1349,65 @@ async function addFiles(files){
   hideToast();toast(`${list.length} video${list.length>1?'s':''} toegevoegd ✓`);
 }
 
+// Niet-directe hosts (geen los .mp4/.webm-bestand) → kunnen niet als <video src> spelen
+const NON_DIRECT=/(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|tiktok\.com|instagram\.com|facebook\.com|twitch\.tv|drive\.google\.com|dropbox\.com\/s|\.m3u8($|\?))/i;
+
+// Laadt metadata ZONDER crossOrigin te forceren (zo werken directe links zonder CORS-headers wel).
+// Probeert een thumbnail; als de canvas door CORS "getaint" is, geeft het gewoon thumb:null terug.
+function probeUrl(url){
+  return new Promise(resolve=>{
+    const v=document.createElement('video');
+    v.muted=true;v.playsInline=true;v.preload='metadata';
+    let done=false;
+    const finish=(ok,dur,thumb)=>{if(done)return;done=true;clearTimeout(timer);try{v.removeAttribute('src');v.load();}catch(e){}resolve({ok,dur:dur||0,thumb:thumb||null});};
+    const timer=setTimeout(()=>finish(false,0,null),8000);
+    v.onloadedmetadata=()=>{
+      const dur=v.duration||0;
+      const seekTo=Math.min(Math.max(dur*0.1,0.5), dur>1?dur-0.1:0.1);
+      const grab=()=>{
+        let thumb=null;
+        try{
+          const c=document.createElement('canvas');
+          c.width=320;c.height=Math.round(320*(v.videoHeight/v.videoWidth||0.5625))||180;
+          c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+          thumb=c.toDataURL('image/jpeg',0.6);
+        }catch(e){thumb=null;} // CORS-taint → geen thumb, maar afspelen kan nog prima
+        finish(true,dur,thumb);
+      };
+      v.onseeked=grab;
+      try{v.currentTime=seekTo;}catch(e){grab();}
+    };
+    v.onerror=()=>finish(false,0,null);
+    v.src=url;
+  });
+}
+
 async function addUrl(url,title){
-  url=url.trim();if(!url)return;
+  url=(url||'').trim();if(!url)return;
+  // URL normaliseren: schema toevoegen indien vergeten
+  if(!/^https?:\/\//i.test(url)){
+    if(/^\/\//.test(url))url='https:'+url; else url='https://'+url;
+  }
+  let host='';try{host=new URL(url).hostname;}catch(e){hideToast();toast('Ongeldige URL');return;}
+  toast('Toevoegen…',true);
   const rec={
-    id:uid(),type:'url',title:title||url.split('/').pop().replace(/\.[^.]+$/,'')||'Video',
+    id:uid(),type:'url',title:title||(url.split('/').pop()||'').replace(/\.[^.]+$/,'').replace(/[?#].*$/,'')||host||'Video',
     url,mime:'video/mp4',size:0,duration:0,thumb:null,
     addedAt:Date.now(),views:0,lastViewedAt:0,favorite:false,album:null,resume:0
   };
-  // probeer thumb/dur (kan door CORS mislukken)
-  try{const m=await genThumb(url);if(m.thumb)rec.thumb=m.thumb;if(m.dur)rec.duration=m.dur;}catch(e){}
+  if(NON_DIRECT.test(url)){
+    // Bekende pagina-/streamhost: bewaren mag, maar waarschuw dat afspelen waarschijnlijk niet werkt
+    await putVideo(rec);await refreshData();renderAll();
+    hideToast();toast('Toegevoegd, maar dit lijkt geen directe videolink. Gebruik een .mp4/.webm-adres.',false,4500);
+    return;
+  }
+  const m=await probeUrl(url);
+  if(m.dur)rec.duration=m.dur;
+  if(m.thumb)rec.thumb=m.thumb;
   await putVideo(rec);await refreshData();renderAll();
-  toast('Video toegevoegd ✓');
+  hideToast();
+  if(m.ok)toast('Video toegevoegd ✓');
+  else toast('Toegevoegd, maar kon de video niet laden. Controleer of het een directe .mp4/.webm-link is.',false,4500);
 }
 
 /* =================================================================
@@ -1118,6 +1610,14 @@ function saveResume(){
   if(curVid && V.duration){curVid.resume=(V.currentTime<V.duration-2)?V.currentTime:0;putVideo(curVid);}
 }
 $('#pvClose').addEventListener('click',closePlayer);
+// Foutmelding tonen wanneer een (URL-)video niet laadt — alleen bij actieve speler met bron,
+// zodat het wissen van src bij sluiten geen valse melding geeft.
+V.addEventListener('error',()=>{
+  if(!$('#player').classList.contains('show'))return;
+  if(!V.getAttribute('src'))return;
+  hideToast();
+  toast('Kon deze video niet afspelen. Mogelijk is het geen directe link of blokkeert de site het.',false,4500);
+});
 
 /* controls visibility */
 function showCtrls(){
@@ -1242,7 +1742,7 @@ function urlSheet(){
     <div class="field"><label>TITEL (optioneel)</label><input id="urlTitle" type="text" placeholder="Naam"></div>
     <div class="sheet-actions"><button class="btn-ghost" id="urlCancel">Annuleer</button><button class="btn-primary" id="urlAdd">Toevoegen</button></div>`);
   $('#urlCancel').onclick=closeSheet;
-  $('#urlAdd').onclick=()=>{const u=$('#urlInput').value;if(!u){toast('Vul een URL in');return;}closeSheet();toast('Toevoegen…',true);addUrl(u,$('#urlTitle').value);};
+  $('#urlAdd').onclick=()=>{const u=$('#urlInput').value;if(!u.trim()){toast('Vul een URL in');return;}closeSheet();addUrl(u,$('#urlTitle').value);};
 }
 
 /* video item menu */
@@ -1360,7 +1860,6 @@ $('#btnWipe').addEventListener('click',async()=>{
    ================================================================= */
 (async function init(){
   await ensurePin();
-  renderTi();
   try{await refreshData();}catch(e){console.warn(e);}
 })();
 </script>

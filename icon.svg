@@ -1,11 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#1b73e8"/>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".12"/>
-      <stop offset="1" stop-color="#000000" stop-opacity=".15"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f8ec9"/>
+      <stop offset="1" stop-color="#15597f"/>
+    </linearGradient>
+    <linearGradient id="lcd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2730"/>
+      <stop offset="1" stop-color="#0d161c"/>
     </linearGradient>
   </defs>
-  <text x="256" y="360" font-family="Helvetica,Arial,sans-serif" font-size="320" font-weight="700" fill="#ffffff" text-anchor="middle">÷</text>
+
+  <!-- achtergrond -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- rekenmachine-body (binnen veilige zone voor maskable) -->
+  <rect x="150" y="86" width="212" height="340" rx="30" fill="#f4f7fa"/>
+  <rect x="150" y="86" width="212" height="340" rx="30" fill="none" stroke="#d4dde6" stroke-width="2"/>
+
+  <!-- LCD-scherm -->
+  <rect x="172" y="110" width="168" height="74" rx="12" fill="url(#lcd)"/>
+  <rect x="186" y="138" width="86" height="9" rx="4" fill="#7fe3c4"/>
+  <rect x="186" y="156" width="140" height="7" rx="3" fill="#3f6b66"/>
+
+  <!-- toetsen 3 x 4 -->
+  <g fill="#e3e9f0" stroke="#cdd7e0" stroke-width="2">
+    <rect x="176" y="210" width="44" height="40" rx="9"/>
+    <rect x="234" y="210" width="44" height="40" rx="9"/>
+    <rect x="292" y="210" width="44" height="40" rx="9"/>
+
+    <rect x="176" y="262" width="44" height="40" rx="9"/>
+    <rect x="234" y="262" width="44" height="40" rx="9"/>
+    <rect x="292" y="262" width="44" height="40" rx="9"/>
+
+    <rect x="176" y="314" width="44" height="40" rx="9"/>
+    <rect x="234" y="314" width="44" height="40" rx="9"/>
+    <rect x="292" y="314" width="44" height="40" rx="9"/>
+
+    <rect x="176" y="366" width="44" height="40" rx="9"/>
+    <rect x="234" y="366" width="44" height="40" rx="9"/>
+  </g>
+
+  <!-- accent: ENTER-toets -->
+  <rect x="292" y="366" width="44" height="40" rx="9" fill="#16a36a" stroke="none"/>
 </svg>
