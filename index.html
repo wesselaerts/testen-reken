@@ -476,7 +476,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
         <button class="btn-ghost" id="btnChangePin" style="padding:9px 14px;border-radius:11px;font-size:13px;">Wijzig</button>
       </div>
       <div class="set-row">
-        <div class="lab">Noodcode<small id="duressInfo">Opent een lege lokkluis</small></div>
+        <div class="lab">Tweede code<small id="duressInfo">Eigen, los versleutelde bibliotheek</small></div>
         <button class="btn-ghost" id="btnDuress" style="padding:9px 14px;border-radius:11px;font-size:13px;">Instellen</button>
       </div>
       <div class="set-row">
@@ -630,28 +630,32 @@ async function _kek(code,salt){
   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(code),'PBKDF2',false,['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:KDF_ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
-async function ensureCrypto(code){
-  // herstel of maak de masterkey voor deze sessie
-  const salt = prefs.kdfSalt ? _b64d(prefs.kdfSalt) : _rand(16);
+// elke kluis (hoofd of de tweede) heeft een EIGEN, los gewikkelde masterkey
+function vaultKeys(second){ return second ? {salt:'kdfSalt2',iv:'wrapIv2',wrapped:'wrappedKey2'} : {salt:'kdfSalt',iv:'wrapIv',wrapped:'wrappedKey'}; }
+async function ensureCrypto(code, second){
+  // herstel of maak de masterkey voor déze kluis (hoofd of tweede)
+  const K=vaultKeys(second);
+  const salt = prefs[K.salt] ? _b64d(prefs[K.salt]) : _rand(16);
   const kek = await _kek(code, salt);
-  if(prefs.wrappedKey){
-    const raw = await crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(prefs.wrapIv)}, kek, _b64d(prefs.wrappedKey));
+  if(prefs[K.wrapped]){
+    const raw = await crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(prefs[K.iv])}, kek, _b64d(prefs[K.wrapped]));
     MK = await crypto.subtle.importKey('raw', raw, {name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
   }else{
     MK = await crypto.subtle.generateKey({name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
     const raw = await crypto.subtle.exportKey('raw', MK);
     const iv = _rand(12);
     const wrapped = await crypto.subtle.encrypt({name:'AES-GCM',iv}, kek, raw);
-    prefs.kdfSalt=_b64e(salt); prefs.wrapIv=_b64e(iv); prefs.wrappedKey=_b64e(wrapped);
+    prefs[K.salt]=_b64e(salt); prefs[K.iv]=_b64e(iv); prefs[K.wrapped]=_b64e(wrapped);
     savePrefs(prefs);
   }
 }
-async function rewrapKey(newCode){
+async function rewrapKey(newCode, second){
   if(!MK) return false;
+  const K=vaultKeys(second);
   const salt=_rand(16), kek=await _kek(newCode,salt);
   const raw=await crypto.subtle.exportKey('raw',MK), iv=_rand(12);
   const wrapped=await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,raw);
-  prefs.kdfSalt=_b64e(salt); prefs.wrapIv=_b64e(iv); prefs.wrappedKey=_b64e(wrapped);
+  prefs[K.salt]=_b64e(salt); prefs[K.iv]=_b64e(iv); prefs[K.wrapped]=_b64e(wrapped);
   savePrefs(prefs);
   return true;
 }
@@ -715,7 +719,7 @@ async function encodeRecord(v){
   const r={id:v.id,type:v.type,mime:v.mime,size:v.size||0,duration:v.duration||0,
     addedAt:v.addedAt,views:v.views||0,lastViewedAt:v.lastViewedAt||0,
     favorite:!!v.favorite,album:v.album||null,resume:v.resume||0,decoy:!!v.decoy};
-  if(MK && !v.decoy && !v._plain){
+  if(MK && !v._plain){
     r.enc=true;
     r.titleEnc=await encStr(v.title||'');
     r.thumbEnc=v.thumb?await encStr(v.thumb):null;
@@ -743,7 +747,7 @@ async function decodeRecord(r){
 }
 async function putVideo(v){
   // nieuwe versleutelde videobestanden: blob blok-voor-blok opslaan (geheugenveilig), één keer
-  if(MK && !v.decoy && !v._plain && v.type==='file' && v.blob && !v._blobEnc){
+  if(MK && !v._plain && v.type==='file' && v.blob && !v._blobEnc){
     const id=v.id;
     const n=await storeChunks(id, v.blob);
     v._blobEnc={chunked:true, n, mime:v.blob.type||'video/mp4', size:v.blob.size||0};
@@ -767,27 +771,24 @@ async function delAlbum(id){return idbReq((await tx('albums','readwrite')).delet
 let VIDEOS=[],ALBUMS=[];
 async function refreshData(){
   const raw=(await allVideos())||[];
-  ALBUMS=(await allAlbums())||[];
+  // albums strikt per kluis scheiden (inhoud van de twee kluizen kruist nooit)
+  ALBUMS=((await allAlbums())||[]).filter(a=> (!!a.decoy)===decoyMode);
   const out=[];
   for(const r of raw){
-    if(decoyMode){
-      if(r.decoy && !r.enc) out.push(r);          // lokkluis: alleen lok-items
-    }else{
-      if(r.decoy) continue;                        // echte kluis: lok-items verbergen
-      if(r.enc){ if(MK) out.push(await decodeRecord(r)); }
-      else { r._plain=true; out.push(r); }         // ouder (onversleuteld) item — zo laten
-    }
+    if((!!r.decoy)!==decoyMode) continue;           // alleen items van de geopende kluis
+    if(r.enc){ if(MK) out.push(await decodeRecord(r)); }  // versleuteld → met de sleutel van DEZE kluis
+    else { r._plain=true; out.push(r); }            // ouder (onversleuteld) item — zo laten
   }
   VIDEOS=out;
 }
-/* handmatig & veilig: bestaande onversleutelde video's één voor één blok-voor-blok versleutelen */
+/* handmatig & veilig: onversleutelde video's van DEZE kluis blok-voor-blok versleutelen */
 async function migrateToEncrypted(onProgress){
   if(!MK) return {done:0,total:0};
   const raw=(await allVideos())||[];
-  const todo=raw.filter(r=>!r.enc && !r.decoy);
+  const todo=raw.filter(r=>!r.enc && (!!r.decoy)===decoyMode);
   let done=0;
   for(const r of raw){
-    if(r.enc || r.decoy) continue;
+    if(r.enc || (!!r.decoy)!==decoyMode) continue;
     try{
       const v=Object.assign({}, r);       // bevat nog de platte blob/titel/thumb
       delete v._plain;                    // forceer versleuteling
@@ -1486,10 +1487,10 @@ return { reset, render };
    ================================================================= */
 async function openVault(code, decoy){
   decoyMode=!!decoy; MK=null;
-  SESSION_CODE = (!decoyMode && code!=null) ? code : null;
+  SESSION_CODE = (code!=null) ? code : null;
   $('#cover').classList.remove('active');
   $('#vault').classList.add('active');
-  try{ if(!decoyMode && code!=null) await ensureCrypto(code); }catch(e){ console.warn(e); }
+  try{ if(code!=null) await ensureCrypto(code, decoyMode); }catch(e){ console.warn(e); }
   await refreshData(); renderAll(); updateStorage();
   requestPersist();
 }
@@ -2121,7 +2122,7 @@ function newAlbumSheet(cb){
   $('#alCancel').onclick=closeSheet;
   $('#alSave').onclick=async()=>{
     const n=$('#alInput').value.trim();if(!n){toast('Vul een naam in');return;}
-    const a={id:uid(),name:n,createdAt:Date.now()};await putAlbum(a);await refreshData();
+    const a={id:uid(),name:n,createdAt:Date.now(),decoy:decoyMode};await putAlbum(a);await refreshData();
     if(cb)cb(a.id);else{closeSheet();renderAlbums();}
   };
 }
@@ -2157,30 +2158,35 @@ $('#btnChangePin').addEventListener('click',()=>{
   $('#pinCancel').onclick=closeSheet;
   $('#pinSave').onclick=async()=>{
     const old=$('#pinOld').value,nw=$('#pinNew').value;
-    if(await sha(old)!==prefs.pinHash){toast('Huidige code klopt niet');return;}
+    const curHash = decoyMode ? prefs.duressHash : prefs.pinHash;
+    const otherHash = decoyMode ? prefs.pinHash : prefs.duressHash;
+    if(await sha(old)!==curHash){toast('Huidige code klopt niet');return;}
     if(!/^\d{3,}$/.test(nw)){toast('Kies minstens 3 cijfers');return;}
-    prefs.pinHash=await sha(nw);await rewrapKey(nw);savePrefs(prefs);closeSheet();toast('Code gewijzigd ✓');
+    const nh=await sha(nw);
+    if(otherHash && nh===otherHash){toast('Deze code is al in gebruik');return;}
+    if(decoyMode) prefs.duressHash=nh; else prefs.pinHash=nh;
+    await rewrapKey(nw, decoyMode);savePrefs(prefs);closeSheet();toast('Code gewijzigd ✓');
   };
 });
-/* ---------- noodcode (lokkluis) ---------- */
+/* ---------- tweede code (eigen, los versleutelde bibliotheek) ---------- */
 function refreshDuressInfo(){
   const el=$('#duressInfo'); if(!el)return;
-  el.textContent = prefs.duressHash ? 'Ingesteld — opent een lege lokkluis' : 'Opent een lege lokkluis';
+  el.textContent = prefs.duressHash ? 'Ingesteld — eigen versleutelde bibliotheek' : 'Eigen, los versleutelde bibliotheek';
   $('#btnDuress').textContent = prefs.duressHash ? 'Wijzig' : 'Instellen';
 }
 $('#btnDuress').addEventListener('click',()=>{
-  openSheet(`<div class="grab"></div><h3>Noodcode</h3>
-    <p class="hint" style="margin-bottom:14px">Een tweede cijfercode die op de rekenmachine een <b>lege lokkluis</b> opent in plaats van je echte video's. Handig als iemand je dwingt te ontgrendelen.</p>
-    <div class="field"><label>NOODCODE (alleen cijfers)</label><input id="duInput" type="number" inputmode="numeric" placeholder="••••"></div>
+  openSheet(`<div class="grab"></div><h3>Tweede code</h3>
+    <p class="hint" style="margin-bottom:14px">Een tweede cijfercode met een <b>volledig eigen, even sterk versleutelde</b> bibliotheek. De inhoud staat helemaal los van je andere code en kruist er nooit mee — elke code opent zijn eigen, aparte ruimte.</p>
+    <div class="field"><label>TWEEDE CODE (alleen cijfers)</label><input id="duInput" type="number" inputmode="numeric" placeholder="••••"></div>
     <div class="sheet-actions">${prefs.duressHash?'<button class="btn-ghost" id="duClear" style="color:var(--v-rose)">Verwijderen</button>':'<button class="btn-ghost" id="duCancel">Annuleer</button>'}<button class="btn-primary" id="duSave">Opslaan</button></div>`);
   const c=$('#duCancel'); if(c)c.onclick=closeSheet;
-  const cl=$('#duClear'); if(cl)cl.onclick=()=>{delete prefs.duressHash;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Noodcode verwijderd');};
+  const cl=$('#duClear'); if(cl)cl.onclick=()=>{delete prefs.duressHash;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Tweede code verwijderd');};
   $('#duSave').onclick=async()=>{
     const v=$('#duInput').value;
     if(!/^\d{3,}$/.test(v)){toast('Kies minstens 3 cijfers');return;}
     const h=await sha(v);
-    if(h===prefs.pinHash){toast('Mag niet gelijk zijn aan je echte code');return;}
-    prefs.duressHash=h;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Noodcode ingesteld ✓');
+    if(h===prefs.pinHash){toast('Mag niet gelijk zijn aan je andere code');return;}
+    prefs.duressHash=h;savePrefs(prefs);refreshDuressInfo();closeSheet();toast('Tweede code ingesteld ✓');
   };
 });
 
@@ -2250,7 +2256,7 @@ async function exportBackup(){
   toast('Back-up maken…',true);
   try{
     const raw=(await allVideos())||[], albums=(await allAlbums())||[];
-    const p={pinHash:prefs.pinHash,duressHash:prefs.duressHash||null,kdfSalt:prefs.kdfSalt||null,wrapIv:prefs.wrapIv||null,wrappedKey:prefs.wrappedKey||null,autolock:prefs.autolock,autoplay:prefs.autoplay};
+    const p={pinHash:prefs.pinHash,duressHash:prefs.duressHash||null,kdfSalt:prefs.kdfSalt||null,wrapIv:prefs.wrapIv||null,wrappedKey:prefs.wrappedKey||null,kdfSalt2:prefs.kdfSalt2||null,wrapIv2:prefs.wrapIv2||null,wrappedKey2:prefs.wrappedKey2||null,autolock:prefs.autolock,autoplay:prefs.autoplay};
     const parts=[JSON.stringify({format:'numa-backup',v:3,exportedAt:Date.now(),prefs:p,albums:albums})+'\n'];
     for(let i=0;i<raw.length;i++){ await streamVideoLines(raw[i], parts); toast('Back-up maken… '+(i+1)+'/'+raw.length,true); }
     const blob=new Blob(parts,{type:'application/json'});
@@ -2263,7 +2269,7 @@ async function exportBackup(){
   }catch(e){hideToast();toast('Back-up mislukt');console.warn(e);}
 }
 function _applyBackupPrefs(p){
-  ['pinHash','duressHash','kdfSalt','wrapIv','wrappedKey'].forEach(k=>{ prefs[k]=p[k]!==undefined?p[k]:prefs[k]; });
+  ['pinHash','duressHash','kdfSalt','wrapIv','wrappedKey','kdfSalt2','wrapIv2','wrappedKey2'].forEach(k=>{ prefs[k]=p[k]!==undefined?p[k]:prefs[k]; });
   if(p.autolock!==undefined)prefs.autolock=p.autolock; if(p.autoplay!==undefined)prefs.autoplay=p.autoplay;
   savePrefs(prefs);
 }
@@ -2326,7 +2332,7 @@ $('#importPick').addEventListener('change',e=>{ if(e.target.files[0])importBacku
 $('#btnEncryptAll').addEventListener('click',async()=>{
   if(!MK){ toast('Open de kluis eerst met je code'); return; }
   const raw=(await allVideos())||[];
-  const todo=raw.filter(r=>!r.enc && !r.decoy).length;
+  const todo=raw.filter(r=>!r.enc && (!!r.decoy)===decoyMode).length;
   if(!todo){ toast('Alles is al versleuteld ✓'); return; }
   if(!confirm(todo+' video'+(todo===1?'':'\u2019s')+' versleutelen? Dit kan even duren — laat de app open.')) return;
   $('#btnEncryptAll').disabled=true;
@@ -2357,14 +2363,16 @@ $('#btnPersist').addEventListener('click',async()=>{
   }else toast('Niet ondersteund');
 });
 $('#btnWipe').addEventListener('click',async()=>{
-  if(!confirm('ALLES wissen? Dit verwijdert al je video\'s onherstelbaar.'))return;
+  if(!confirm('Alles in deze bibliotheek wissen? Dit verwijdert deze video\'s onherstelbaar.'))return;
   if(!confirm('Echt zeker? Dit kan niet ongedaan worden.'))return;
-  const d=await db();await Promise.all([
-    new Promise(r=>{const t=d.transaction('videos','readwrite');t.objectStore('videos').clear();t.oncomplete=r;}),
-    new Promise(r=>{const t=d.transaction('albums','readwrite');t.objectStore('albums').clear();t.oncomplete=r;}),
-    new Promise(r=>{const t=d.transaction('blobs','readwrite');t.objectStore('blobs').clear();t.oncomplete=r;})
-  ]);
-  await refreshData();renderAll();updateStorage();toast('Alles gewist');
+  // alleen de inhoud van de NU geopende kluis wissen — de andere blijft volledig intact
+  try{
+    const vids=(await allVideos())||[];
+    for(const r of vids){ if((!!r.decoy)===decoyMode) await delVideo(r.id); }
+    const albs=(await allAlbums())||[];
+    for(const a of albs){ if((!!a.decoy)===decoyMode) await delAlbum(a.id); }
+  }catch(e){ console.warn(e); }
+  await refreshData();renderAll();updateStorage();toast('Gewist');
 });
 
 /* =================================================================
