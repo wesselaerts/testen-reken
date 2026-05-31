@@ -2154,13 +2154,13 @@ function videoMenu(id){
     <div class="sheet-item" id="mFav"><svg viewBox="0 0 24 24" fill="${v.favorite?'var(--v-rose)':'none'}" stroke-width="1.8"><path d="M12 21s-7-4.5-9.5-9C1 9 2.5 5 6 5c2 0 3 1 4 2 1-1 2-2 4-2 3.5 0 5 4 3.5 7-2.5 4.5-9.5 9-9.5 9z"/></svg>${v.favorite?'Uit favorieten':'Favoriet maken'}</div>
     <div class="sheet-item" id="mRename"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Naam wijzigen</div>
     <div class="sheet-item" id="mAlbum"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M6 7V5a2 2 0 0 1 2-2h3l2 2h5"/></svg>Verplaats naar album</div>
-    <div class="sheet-item" id="mShare"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>Versleuteld exporteren<small>Voor een ander toestel met dezelfde code</small></div>
+    <div class="sheet-item" id="mShare"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>Versleuteld exporteren<small>Met je code of een eigen wachtwoord</small></div>
     <div class="sheet-item danger" id="mDel"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>Verwijderen</div>`);
   $('#mPlay').onclick=()=>{closeSheet();openPlayer(id);};
   $('#mFav').onclick=async()=>{v.favorite=!v.favorite;await putVideo(v);await refreshData();renderAll();closeSheet();};
   $('#mRename').onclick=()=>renameSheet(v);
   $('#mAlbum').onclick=()=>albumPickSheet(v);
-  $('#mShare').onclick=()=>{closeSheet();shareExport([id]);};
+  $('#mShare').onclick=()=>shareOneSheet(id);
   $('#mDel').onclick=async()=>{if(confirm('Deze video verwijderen?')){await delVideo(id);await refreshData();renderAll();updateStorage();closeSheet();toast('Verwijderd');}};
 }
 function renameSheet(v){
@@ -2627,6 +2627,20 @@ async function deriveTransport(code,salt,iter){
   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(code),'PBKDF2',false,['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter||KDF_ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
+/* vraagt het zelfgekozen wachtwoord bij het importeren van een wachtwoord-bestand */
+function pwdPrompt(title){
+  return new Promise(res=>{
+    let done=false;
+    const finish=(v)=>{ if(done) return; done=true; closeSheet(); res(v); };
+    openSheet(`<div class="grab"></div><h3>${escapeHtml(title||'Wachtwoord')}</h3>
+      <p style="font-size:12.5px;color:var(--v-muted,rgba(255,255,255,.5));margin:0 0 8px;line-height:1.5;">Dit bestand is met een eigen wachtwoord versleuteld. Typ exact hetzelfde wachtwoord om het te openen.</p>
+      <div class="field"><label>WACHTWOORD</label><input id="pwIn" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+      <div class="sheet-actions"><button class="btn-ghost" id="pwC">Annuleer</button><button class="btn-primary" id="pwOk">Ontgrendel</button></div>`);
+    $('#pwC').onclick=()=>finish(null);
+    $('#pwOk').onclick=()=>{ const v=($('#pwIn').value||''); if(!v){ toast('Voer een wachtwoord in'); return; } finish(v); };
+    const inp=$('#pwIn'); if(inp){ inp.addEventListener('keydown',e=>{ if(e.key==='Enter') $('#pwOk').click(); }); setTimeout(()=>{ try{ inp.focus(); }catch(e){} },60); }
+  });
+}
 async function materializeBlob(raw){
   if(!raw || raw.type==='url') return null;
   if(raw.enc && raw.blobEnc && raw.blobEnc.chunked) return await loadChunkedBlob(raw.id, raw.blobEnc);
@@ -2638,21 +2652,52 @@ function shareSelectSheet(){
   if(!list.length){ toast('Geen video\u2019s om te delen'); return; }
   const rows=list.map(v=>`<label class="share-row"><input type="checkbox" value="${v.id}"><span>${escapeHtml(v.title)}</span></label>`).join('');
   openSheet(`<div class="grab"></div><h3>Versleuteld delen</h3>
-    <p style="font-size:12.5px;color:var(--v-muted,rgba(255,255,255,.5));margin:0 0 6px;line-height:1.5;">Kies de video\u2019s die je wilt meenemen. Het bestand is versleuteld en kan <b>alleen</b> geopend worden op een toestel met <b>dezelfde geheime code</b>. Bij importeren komen ze <b>bovenop</b> de bestaande kluis — je wist niets.</p>
+    <p style="font-size:12.5px;color:var(--v-muted,rgba(255,255,255,.5));margin:0 0 6px;line-height:1.5;">Kies de video\u2019s die je wilt meenemen. Laat het wachtwoord <b>leeg</b> om met je eigen kluiscode te versleutelen (alleen te openen op een toestel met dezelfde code). Of geef een <b>eigen wachtwoord</b> op \u2014 dan opent het bestand op elk toestel door dat wachtwoord in te typen. Bij importeren komen ze <b>bovenop</b> de bestaande kluis.</p>
     <div class="share-list">${rows}</div>
+    <div class="field"><label>EIGEN WACHTWOORD (OPTIONEEL)</label><input id="shPw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="leeg = je eigen code"></div>
+    <div class="field"><label>HERHAAL WACHTWOORD</label><input id="shPw2" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="alleen nodig bij eigen wachtwoord"></div>
     <div class="sheet-actions"><button class="btn-ghost" id="shCancel">Annuleer</button><button class="btn-primary" id="shGo">Exporteer</button></div>`);
   $('#shCancel').onclick=closeSheet;
-  $('#shGo').onclick=()=>{ const ids=$$('.share-list input:checked').map(c=>c.value); if(!ids.length){ toast('Selecteer minstens één video'); return; } closeSheet(); shareExport(ids); };
+  $('#shGo').onclick=()=>{
+    const ids=$$('.share-list input:checked').map(c=>c.value);
+    if(!ids.length){ toast('Selecteer minstens één video'); return; }
+    const pw=($('#shPw').value||''), pw2=($('#shPw2').value||'');
+    if(pw){
+      if(pw.length<4){ toast('Wachtwoord is te kort (min. 4 tekens)'); return; }
+      if(pw!==pw2){ toast('De wachtwoorden komen niet overeen'); return; }
+    }
+    closeSheet(); shareExport(ids, pw||undefined);
+  };
 }
-async function shareExport(ids){
+/* per-video exporteren met de keuze: eigen code óf zelfgekozen wachtwoord */
+function shareOneSheet(id){
+  const v=VIDEOS.find(x=>x.id===id); if(!v){ shareExport([id]); return; }
+  openSheet(`<div class="grab"></div><h3>Versleuteld exporteren</h3>
+    <p style="font-size:12.5px;color:var(--v-muted,rgba(255,255,255,.5));margin:0 0 6px;line-height:1.5;">Laat leeg om met je eigen kluiscode te versleutelen, of geef een <b>eigen wachtwoord</b> op om dit bestand op elk toestel met dat wachtwoord te openen.</p>
+    <div class="field"><label>EIGEN WACHTWOORD (OPTIONEEL)</label><input id="soPw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="leeg = je eigen code"></div>
+    <div class="field"><label>HERHAAL WACHTWOORD</label><input id="soPw2" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="alleen nodig bij eigen wachtwoord"></div>
+    <div class="sheet-actions"><button class="btn-ghost" id="soC">Annuleer</button><button class="btn-primary" id="soGo">Exporteer</button></div>`);
+  $('#soC').onclick=closeSheet;
+  $('#soGo').onclick=()=>{
+    const pw=($('#soPw').value||''), pw2=($('#soPw2').value||'');
+    if(pw){
+      if(pw.length<4){ toast('Wachtwoord is te kort (min. 4 tekens)'); return; }
+      if(pw!==pw2){ toast('De wachtwoorden komen niet overeen'); return; }
+    }
+    closeSheet(); shareExport([id], pw||undefined);
+  };
+}
+async function shareExport(ids, password){
   if(!ids||!ids.length){ toast('Niets geselecteerd'); return; }
-  if(!SESSION_CODE){ toast('Open de kluis met je eigen code'); return; }
+  const usePwd = (typeof password==='string' && password.length>0);
+  const keysrc = usePwd ? password : SESSION_CODE;   // eigen wachtwoord óf je kluiscode
+  if(!keysrc){ toast('Open de kluis met je eigen code'); return; }
   toast('Versleuteld exporteren…',true);
   try{
-    const salt=_rand(16), iter=KDF_ITER, TK=await deriveTransport(SESSION_CODE,salt,iter);
+    const salt=_rand(16), iter=(usePwd?310000:KDF_ITER), TK=await deriveTransport(keysrc,salt,iter);
     const tenc=async(buf)=>{ const iv=_rand(12); const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},TK,buf); return {iv:_b64e(iv),data:_b64e(data)}; };
     const check=await tenc(new TextEncoder().encode('numa-share-ok'));
-    const parts=[JSON.stringify({format:'numa-share',v:1,salt:_b64e(salt),iter,check,count:ids.length,exportedAt:Date.now()})+'\n'];
+    const parts=[JSON.stringify({format:'numa-share',v:1,lock:(usePwd?'pwd':'code'),salt:_b64e(salt),iter,check,count:ids.length,exportedAt:Date.now()})+'\n'];
     let done=0;
     for(const id of ids){
       const raw=await getVideo(id); if(!raw) continue;
@@ -2683,14 +2728,21 @@ async function shareExport(ids){
   }catch(e){ hideToast(); toast('Exporteren mislukt'); console.warn(e); }
 }
 async function shareImport(file){
-  if(!SESSION_CODE){ toast('Open de kluis met je eigen code'); return; }
   let head=''; try{ head=await file.slice(0,8192).text(); }catch(e){ try{ head=(await file.text()).slice(0,8192); }catch(_){} }
   let hdr; try{ const nl=head.indexOf('\n'); hdr=JSON.parse(head.slice(0, nl<0?head.length:nl)); }catch(e){ toast('Niet herkend als gedeeld bestand'); return; }
   if(!hdr || hdr.format!=='numa-share'){ toast('Niet herkend als gedeelde video\u2019s'); return; }
-  const salt=_b64d(hdr.salt), iter=hdr.iter||KDF_ITER, TK=await deriveTransport(SESSION_CODE,salt,iter);
+  let keysrc;
+  if(hdr.lock==='pwd'){
+    keysrc = await pwdPrompt('Wachtwoord van dit bestand');
+    if(keysrc==null) return;                       // geannuleerd
+  }else{
+    if(!SESSION_CODE){ toast('Open de kluis met je eigen code'); return; }
+    keysrc = SESSION_CODE;
+  }
+  const salt=_b64d(hdr.salt), iter=hdr.iter||KDF_ITER, TK=await deriveTransport(keysrc,salt,iter);
   const tdec=async(o)=>crypto.subtle.decrypt({name:'AES-GCM',iv:_b64d(o.iv)},TK,_b64d(o.data));
   try{ const t=new TextDecoder().decode(await tdec(hdr.check)); if(t!=='numa-share-ok') throw 0; }
-  catch(e){ toast('Andere geheime code — dit bestand kan alleen met dezelfde code geopend worden',false,5200); return; }
+  catch(e){ toast(hdr.lock==='pwd' ? 'Onjuist wachtwoord \u2014 kan dit bestand niet openen' : 'Andere geheime code \u2014 dit bestand kan alleen met dezelfde code geopend worden',false,5200); return; }
   toast('Importeren…',true);
   try{
     const chunks={}; let count=0, skippedHeader=false;
@@ -2730,7 +2782,7 @@ async function shareImport(file){
     r.innerHTML='<div class="lab">'+labelHtml+'</div>';
     const b=document.createElement('button'); b.className='btn-ghost'; b.style.cssText='padding:9px 14px;border-radius:11px;font-size:13px;'; b.textContent=btnText; b.onclick=onClick; r.appendChild(b); return r; };
   page.insertBefore(mk('Video\u2019s delen (versleuteld)<small>Exporteer geselecteerde video\u2019s voor een ander toestel</small>','Selecteer',shareSelectSheet), before);
-  page.insertBefore(mk('Gedeelde video\u2019s importeren<small>Voegt toe aan je kluis — vereist dezelfde code</small>','Kies bestand',()=>$('#sharePick').click()), before);
+  page.insertBefore(mk('Gedeelde video\u2019s importeren<small>Voegt toe — vraagt zo nodig om het wachtwoord</small>','Kies bestand',()=>$('#sharePick').click()), before);
   const inp=document.createElement('input'); inp.type='file'; inp.id='sharePick'; inp.accept='.numa,.json,application/octet-stream,application/json'; inp.style.display='none';
   inp.addEventListener('change',e=>{ if(e.target.files[0]) shareImport(e.target.files[0]); e.target.value=''; });
   page.appendChild(inp);
