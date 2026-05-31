@@ -1083,8 +1083,8 @@ function handleEnter(){
   if(state.tokens.length && state.tokens.every(t=>/^[0-9]$/.test(t.code))){
     const code=state.tokens.map(t=>t.code).join('');
     sha(code).then(h=>{
-      if(h===prefs.pinHash){ reset(); openVault(code,false); }
-      else if(prefs.duressHash && h===prefs.duressHash){ reset(); openVault(code,true); }
+      if(h===prefs.pinHash){ reset(); bioGateOpen(code,false); }
+      else if(prefs.duressHash && h===prefs.duressHash){ reset(); bioGateOpen(code,true); }
       else { doEnter(); render(); }
     }).catch(()=>{ doEnter(); render(); });
     return;
@@ -1507,6 +1507,75 @@ function lockVault(){
   $('#searchbar').classList.remove('show');$('#searchInput').value='';searchTerm='';
 }
 $('#btnLock').addEventListener('click',lockVault);
+
+/* =================================================================
+   FACE ID / TOUCH ID — biometrische goedkeuring NA de code, vóór de kluis
+   (via WebAuthn platform-authenticator; geldt voor beide kluizen)
+   Let op: dit is een toegangs-/goedkeuringsstap. De versleuteling zelf
+   blijft afgeleid van je code — Face ID toont of verbergt, het ontsleutelt niet.
+   ================================================================= */
+function bioSupported(){ return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get && window.isSecureContext); }
+async function bioPlatformAvailable(){
+  try{ return bioSupported() && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }
+  catch(e){ return false; }
+}
+async function bioRegister(){
+  if(!bioSupported()) throw new Error('niet ondersteund');
+  const cred = await navigator.credentials.create({ publicKey:{
+    challenge:_rand(32),
+    rp:{ name:'Numa' },                                  // rp.id = huidig domein (automatisch)
+    user:{ id:_rand(16), name:'numa', displayName:'Numa' },
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+    timeout:60000, attestation:'none'
+  }});
+  if(!cred || !cred.rawId) throw new Error('geen credential');
+  prefs.bioCredId=_b64e(cred.rawId); prefs.bioOn=true; savePrefs(prefs);
+  return true;
+}
+async function bioVerify(){
+  if(!bioSupported()) return false;
+  const allow = prefs.bioCredId ? [{type:'public-key', id:_b64d(prefs.bioCredId), transports:['internal']}] : [];
+  const assertion = await navigator.credentials.get({ publicKey:{
+    challenge:_rand(32), allowCredentials:allow, userVerification:'required', timeout:60000
+  }});
+  return !!assertion;
+}
+/* code is al goedgekeurd → vraag (indien aan) Face ID; pas daarna opent de kluis */
+async function bioGateOpen(code, decoy){
+  if(prefs.bioOn){
+    // alleen afdwingen als het toestel het ook echt kan; anders niet buitensluiten
+    if(await bioPlatformAvailable()){
+      try{
+        const ok = await bioVerify();
+        if(!ok){ Calc.reset(); return; }   // mislukt → blijf op de rekenmachine, niets zichtbaar
+      }catch(e){
+        Calc.reset();                       // geannuleerd/afgewezen → niets openen
+        return;
+      }
+    }
+  }
+  openVault(code, decoy);
+}
+/* instellingen-rij: Face ID / Touch ID vereisen (geldt voor beide kluizen) */
+(function injectBioRow(){
+  const page=$('#pageSettings'), before=$('#rowDeleteAll'); if(!page||!before) return;
+  const row=document.createElement('div'); row.className='set-row';
+  row.innerHTML='<div class="lab">Face ID / Touch ID vereisen<small id="bioInfo">Na je code eerst goedkeuren met Face ID</small></div><div class="switch" id="swBio"></div>';
+  page.insertBefore(row, before);
+  const sw=$('#swBio'); sw.classList.toggle('on', !!prefs.bioOn);
+  function info(t){ const el=$('#bioInfo'); if(el) el.textContent=t; }
+  sw.addEventListener('click', async()=>{
+    if(prefs.bioOn){
+      delete prefs.bioOn; delete prefs.bioCredId; savePrefs(prefs);
+      sw.classList.remove('on'); info('Na je code eerst goedkeuren met Face ID'); toast('Face ID uitgezet');
+      return;
+    }
+    if(!bioSupported() || !(await bioPlatformAvailable())){ toast('Face ID/Touch ID niet beschikbaar in deze browser'); return; }
+    try{ await bioRegister(); sw.classList.add('on'); info('Aan — wordt na je code gevraagd'); toast('Face ID ingesteld ✓'); }
+    catch(e){ sw.classList.remove('on'); toast('Face ID instellen geannuleerd'); }
+  });
+})();
 
 /* ===== hulppaneel (ingebedde media-module in iframe) ===== */
 let auxReady=false, auxSel=null, auxUrls=[], auxHtml=null;
